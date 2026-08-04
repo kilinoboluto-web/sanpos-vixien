@@ -1,0 +1,38 @@
+{
+  "name": "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ",
+  "short_name": "SanPOS Vichian",
+  "description": "ระบบขายหน้าร้าน (POS) ปั๊มน้ำมัน วิเชียร ขายเครื่อง อาหารสด แช่แข็ง",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F4EE",
+  "theme_color": "#143C30",
+  "lang": "lo",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
