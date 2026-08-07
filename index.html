@@ -1,443 +1,473 @@
-<!-- START OF FILE pos-grocery-pro.html -->
 <!DOCTYPE html>
 <html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SAN POS PRO</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Sarabun:wght@400;500;600&family=Noto+Sans+Lao:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+    <title>SAN POS ULTIMATE</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600&family=Noto+Sans+Lao:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
-#pos-root {
-  --paper: #F2F4EE;
-  --surface: #FFFFFF;
-  --ink: #1C2320;
-  --ink-soft: #5B655F;
-  --green: #1F5F4A;
-  --green-dark: #143C30;
-  --green-soft: #E4EEE8;
-  --gold: #E8A33D;
-  --gold-soft: #FBEBD1;
-  --brick: #C1502E;
-  --brick-soft: #F8E4DD;
-  --line: #DDE3D9;
-  font-family: 'Sarabun', 'Noto Sans Lao', sans-serif;
-  color: var(--ink);
-  background: var(--paper);
-  min-height: 100vh; /* เต็มจอ */
-  display: flex;
-  flex-direction: column;
-}
+        :root {
+            --primary: #1F5F4A;
+            --primary-dark: #143C30;
+            --gold: #E8A33D;
+            --surface: #FFFFFF;
+            --bg: #F2F4EE;
+            --ink: #1C2320;
+            --line: #DDE3D9;
+            --danger: #C1502E;
+        }
 
-#pos-root[data-lang="lo"] { font-family: 'Noto Sans Lao', 'Sarabun', sans-serif; }
-#pos-root * { box-sizing: border-box; }
-#pos-root h1, #pos-root h2, #pos-root h3, #pos-root .display {
-  font-family: 'Kanit', 'Noto Sans Lao', sans-serif;
-  letter-spacing: 0.01em;
-}
-#pos-root .mono { font-family: 'IBM Plex Mono', monospace; }
-#pos-root button { font-family: inherit; cursor: pointer; border: none; }
-#pos-root input, #pos-root select { font-family: inherit; }
+        body {
+            margin: 0;
+            font-family: 'Sarabun', 'Noto Sans Lao', sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-/* ปรับ Header ให้เต็มจอ */
-.pos-header {
-  background: var(--green-dark);
-  color: #fff;
-  padding: 14px 20px;
-  flex-shrink: 0;
-}
-.pos-header-top { display:flex; align-items:center; justify-content:space-between; width:100%; gap:12px; flex-wrap:nowrap; }
-.pos-header h1 { font-size: 20px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px; }
-.pos-header h1 .tag { background: var(--gold); color: var(--green-dark); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; }
+        /* Header & Tabs */
+        .header {
+            background: var(--primary-dark);
+            color: white;
+            padding: 10px 15px;
+            flex-shrink: 0;
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .tabs {
+            display: flex; gap: 5px; overflow-x: auto;
+            padding: 10px 0 5px; border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .tab-btn {
+            background: rgba(255,255,255,0.1); color: white; border: none;
+            padding: 8px 15px; border-radius: 8px; white-space: nowrap; cursor: pointer;
+            font-size: 13px; font-weight: 500;
+        }
+        .tab-btn.active { background: var(--gold); color: var(--primary-dark); font-weight: 700; }
 
-.pos-tabs { display: flex; gap: 4px; background: rgba(255,255,255,0.08); padding: 4px; border-radius: 10px; overflow-x:auto; margin-top:10px; width:100%; }
-.pos-tab-btn { background: transparent; color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 600; padding: 10px 15px; border-radius: 8px; white-space:nowrap; }
-.pos-tab-btn.active { background: var(--gold); color: var(--green-dark); }
+        /* Main Body Layout */
+        .main-container {
+            flex-grow: 1;
+            display: flex;
+            overflow: hidden;
+            height: 100%;
+        }
 
-.pos-body { padding: 15px; flex-grow: 1; overflow-y: auto; }
+        /* Sell Screen Layout */
+        .sell-grid {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            width: 100%;
+            height: 100%;
+        }
 
-/* ---- SELL GRID (Responsive) ---- */
-.sell-grid { 
-  display: grid; 
-  grid-template-columns: 1fr 360px; 
-  gap: 15px; 
-  align-items: start; 
-}
-@media (max-width: 992px) { 
-  .sell-grid { grid-template-columns: 1fr; } 
-  .receipt-wrap { position: static; }
-}
+        @media (max-width: 900px) {
+            .sell-grid { grid-template-columns: 1fr; grid-template-rows: 1fr 200px; }
+            .cart-panel { border-left: none !important; border-top: 2px solid var(--line); }
+        }
 
-/* ปรับปรุง Product Card ให้มีรูป */
-.product-card { 
-  background: var(--surface); 
-  border: 1.5px solid var(--line); 
-  border-radius: 12px; 
-  padding: 0; 
-  overflow: hidden; 
-  display: flex; 
-  flex-direction: column; 
-  min-height: 180px; 
-}
-.p-img-box { width: 100%; height: 100px; background: #eee; overflow: hidden; }
-.p-img-box img { width: 100%; height: 100%; object-fit: cover; }
-.p-info-box { padding: 10px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-.pname { font-size: 14px; font-weight: 600; line-height: 1.3; }
-.pprice { font-size: 16px; font-weight: 700; color: var(--green-dark); }
+        .product-area {
+            padding: 15px;
+            overflow-y: auto;
+            background: var(--bg);
+        }
 
-/* ช่องใส่จำนวนในตะกร้า */
-.qty-input-inline {
-  width: 50px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  text-align: center;
-  font-weight: 600;
-}
+        .cart-panel {
+            background: white;
+            display: flex;
+            flex-direction: column;
+            border-left: 2px solid var(--line);
+        }
 
-/* ส่วนพิมพ์ป้ายราคา (Hidden on Screen) */
-#print-tag-portal { display: none; }
-@media print {
-  body > *:not(#print-tag-portal):not(#print-receipt-portal) { display: none !important; }
-  #print-tag-portal { 
-    display: block !important; 
-    display: flex !important; 
-    flex-wrap: wrap; 
-    gap: 5px; 
-  }
-  .tag-item {
-    width: 45mm; height: 30mm; border: 0.5px solid #000;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    padding: 2mm; text-align: center; overflow: hidden;
-  }
-  .tag-name { font-size: 10pt; font-weight: bold; height: 2.4em; overflow: hidden; }
-  .tag-price { font-size: 15pt; font-weight: 900; }
-  .tag-bc { height: 10mm; width: 90%; }
-}
-</style>
+        /* Product Cards */
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .p-card {
+            background: white; border: 1px solid var(--line); border-radius: 12px;
+            overflow: hidden; transition: 0.2s; cursor: pointer;
+        }
+        .p-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+        .p-img { width: 100%; height: 100px; object-fit: cover; background: #eee; }
+        .p-info { padding: 8px; }
+        .p-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; height: 1.4em; overflow: hidden; }
+        .p-price { color: var(--primary); font-weight: 700; font-size: 15px; }
+
+        /* Cart Styling */
+        .cart-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        .cart-item {
+            display: grid; grid-template-columns: 1fr 60px 30px;
+            gap: 10px; align-items: center; padding-bottom: 10px;
+            border-bottom: 1px solid #f0f0f0; margin-bottom: 10px;
+        }
+        .qty-input { width: 100%; padding: 5px; text-align: center; border-radius: 5px; border: 1px solid var(--line); font-weight: 700; }
+        
+        .cart-summary {
+            padding: 15px; background: #f9f9f9; border-top: 1px solid var(--line);
+        }
+
+        /* Modal / QR Overlay */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-content {
+            background: white; padding: 25px; border-radius: 20px;
+            width: 90%; max-width: 400px; text-align: center;
+        }
+        .qr-display { width: 200px; height: 200px; margin: 10px auto; border: 5px solid #eee; }
+        .qr-display img { width: 100%; height: 100%; object-fit: contain; }
+
+        /* Stock Table */
+        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; }
+        .data-table th, .data-table td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+
+        /* Print Style */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+            .price-tag { 
+                width: 45mm; height: 28mm; border: 0.5px solid #000; 
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                text-align: center; padding: 1mm;
+            }
+            .tag-bc { height: 10mm; width: 90%; }
+        }
+
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body>
 
-<div id="pos-root" data-lang="th">
-  <div id="pos-mount" class="loading-screen">กำลังโหลด...</div>
+<div class="header">
+    <div class="header-top">
+        <h2 style="margin:0; font-family:'Kanit'; color:var(--gold);">SAN POS PRO</h2>
+        <div id="lang-switch">
+            <button class="tab-btn" onclick="setLang('th')">TH</button>
+            <button class="tab-btn" onclick="setLang('lo')">LO</button>
+            <button class="tab-btn" onclick="setLang('en')">EN</button>
+        </div>
+    </div>
+    <div class="tabs">
+        <button class="tab-btn active" id="btn-sell" onclick="setTab('sell')"><i class="fa fa-cart-shopping"></i> ขาย</button>
+        <button class="tab-btn" id="btn-stock" onclick="setTab('stock')"><i class="fa fa-boxes"></i> สต็อก/ป้าย</button>
+        <button class="tab-btn" id="btn-members" onclick="setTab('members')"><i class="fa fa-users"></i> สมาชิก</button>
+        <button class="tab-btn" id="btn-reports" onclick="setTab('reports')"><i class="fa fa-chart-line"></i> รายงาน/QR</button>
+    </div>
 </div>
 
-<!-- Receipt Portal -->
-<div id="print-receipt-portal"><div id="print-receipt"></div></div>
-<!-- Price Tag Portal -->
-<div id="print-tag-portal"></div>
+<div class="main-container" id="main-view"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<!-- พื้นที่พิมพ์ -->
+<div id="print-area"></div>
+
 <script>
-(function(){
-  const mount = document.getElementById('pos-mount');
-  const root = document.getElementById('pos-root');
+    // --- Data Storage ---
+    let products = JSON.parse(localStorage.getItem('pos-products-v2') || '[]');
+    let members = JSON.parse(localStorage.getItem('pos-members-v2') || '[]');
+    let sales = JSON.parse(localStorage.getItem('pos-sales-v2') || '[]');
+    let categories = JSON.parse(localStorage.getItem('pos-categories-v2') || ['ทั่วไป']);
+    let shopQr = localStorage.getItem('pos-shop-qr') || '';
+    
+    let currentTab = 'sell';
+    let currentLang = 'th';
+    let cart = [];
+    let selectedMemberId = '';
+    let searchQuery = '';
+    let tagQueue = [];
 
-  // ---------- i18n ----------
-  const DICT = {
-    appName: {th:'ร้านค้าของสัน', lo:'ຮ້ານຄ້າຂອງສັນ', en:"San's Store"},
-    tabSell: {th:'ขายสินค้า', lo:'ຂາຍສິນຄ້າ', en:'Sell'},
-    tabProducts: {th:'สต็อก/ป้ายราคา', lo:'ສິນຄ້າ', en:'Products'},
-    tabCategories: {th:'หมวดหมู่', lo:'ໝວດໝູ່', en:'Categories'},
-    tabMembers: {th:'สมาชิก', lo:'ສະມາຊິກ', en:'Members'},
-    tabReports: {th:'รายงาน', lo:'ລາຍງານ', en:'Reports'},
-    retail: {th:'ขายปลีก', lo:'ຂາຍຍ່ອຍ', en:'Retail'},
-    wholesale: {th:'ขายส่ง', lo:'ຂາຍສົ່ງ', en:'Wholesale'},
-    walkIn: {th:'ลูกค้าทั่วไป', lo:'ລູກຄ້າທົ່ວໄປ', en:'Walk-in customer'},
-    memberBadge: {th:'ราคาสมาชิก', lo:'ລາຄາສະມາຊິກ', en:'Member price'},
-    search: {th:'ชื่อสินค้า หรือ สแกนบาร์โค้ด...', lo:'ຄົ້ນຫາ...', en:'Search/Barcode...'},
-    all: {th:'ทั้งหมด', lo:'ທັງໝົດ', en:'All'},
-    stockLeft: {th:'คงเหลือ', lo:'ຄົງເຫຼືອ', en:'left'},
-    receiptTitle: {th:'ใบเสร็จ', lo:'ໃບບິນ', en:'Receipt'},
-    emptyCart: {th:'แตะหรือสแกนสินค้าเพื่อเริ่ม', lo:'ແຕະສິນຄ້າ...', en:'Tap or Scan to start'},
-    pieces: {th:'ชิ้น', lo:'ອັນ', en:'pcs'},
-    grandTotal: {th:'รวมทั้งสิ้น', lo:'ລວມທັງໝົດ', en:'Total'},
-    cashReceived: {th:'รับเงิน', lo:'ຮັບເງິນ', en:'Cash'},
-    change: {th:'เงินทอน', lo:'ເງິນທອນ', en:'Change'},
-    checkout: {th:'ชำระเงิน', lo:'ຊຳລະເງິນ', en:'Checkout'},
-    printReceipt: {th:'พิมพ์ใบเสร็จ', lo:'ພິມໃບບິນ', en:'Print Receipt'},
-    printTag: {th:'พิมพ์ป้ายราคา', lo:'ພິມປ້າຍລາຄາ', en:'Print Tag'},
-    imgUrl: {th:'URL รูปภาพ (จาก Google)', lo:'ຮູບພາບ', en:'Image URL'},
-    barcode: {th:'บาร์โค้ด', lo:'ບາໂຄ້ດ', en:'Barcode'},
-    currency: {th:'฿', lo:'₭', en:'$'},
-  };
-  let lang = 'th';
-  function t(key){ return (DICT[key] && DICT[key][lang]) || key; }
+    const i18n = {
+        th: { total: 'ยอดรวม', pay: 'ชำระเงิน', change: 'เงินทอน', stock: 'คงเหลือ', search: 'ค้นหา/บาร์โค้ด...', checkout: 'สำเร็จ', transfer: 'โอนเงิน', uploadQr: 'อัปโหลด QR ร้าน' },
+        lo: { total: 'ລວມທັງໝົດ', pay: 'ຊຳລະເງິນ', change: 'ເງິນທອນ', stock: 'ຄົງເຫຼືອ', search: 'ຄົ້ນຫາ...', checkout: 'ສຳເລັດ', transfer: 'ໂອນເງິນ', uploadQr: 'ອັບໂຫລດ QR' },
+        en: { total: 'Total', pay: 'Pay', change: 'Change', stock: 'Stock', search: 'Search...', checkout: 'Checkout', transfer: 'Transfer', uploadQr: 'Upload QR' }
+    };
 
-  // ---------- state ----------
-  let products = [];
-  let categories = [];
-  let members = [];
-  let sales = [];
-  let cart = [];
-  let tab = 'sell';
-  let activeCategory = 'ทั้งหมด';
-  let searchQuery = '';
-  let cashInput = '';
-  let saleMode = 'retail';
-  let selectedMemberId = '';
-  let receiptModal = null;
-  let productFormEdit = null;
-  let memberFormEdit = null;
+    function t(key) { return i18n[currentLang][key] || key; }
 
-  async function loadData(){
-    products = JSON.parse(localStorage.getItem('pos-products-v2') || '[]');
-    categories = JSON.parse(localStorage.getItem('pos-categories-v2') || ['อื่นๆ']);
-    members = JSON.parse(localStorage.getItem('pos-members-v2') || []);
-    sales = JSON.parse(localStorage.getItem('pos-sales-v2') || []);
-  }
-  const saveAll = () => {
-    localStorage.setItem('pos-products-v2', JSON.stringify(products));
-    localStorage.setItem('pos-categories-v2', JSON.stringify(categories));
-    localStorage.setItem('pos-members-v2', JSON.stringify(members));
-    localStorage.setItem('pos-sales-v2', JSON.stringify(sales));
-  };
-
-  function priceFor(p){
-    const member = !!selectedMemberId;
-    if (saleMode === 'retail') return member ? (p.priceRetailMember || 0) : (p.priceRetailGeneral || 0);
-    return member ? (p.priceWholesaleMember || 0) : (p.priceWholesaleGeneral || 0);
-  }
-
-  // ---------- render ----------
-  function render(){
-    root.setAttribute('data-lang', lang);
-    mount.innerHTML = `
-      <div class="pos-header">
-        <div class="pos-header-top">
-          <h1>${t('appName')} <span class="tag">PRO</span></h1>
-          <div class="lang-switch">
-            ${['th','lo','en'].map(l => `<button class="lang-btn ${lang===l?'active':''}" onclick="setLang('${l}')">${l.toUpperCase()}</button>`).join('')}
-          </div>
-        </div>
-        <div class="pos-tabs">
-          <button class="pos-tab-btn ${tab==='sell'?'active':''}" onclick="setTab('sell')">${t('tabSell')}</button>
-          <button class="pos-tab-btn ${tab==='products'?'active':''}" onclick="setTab('products')">${t('tabProducts')}</button>
-          <button class="pos-tab-btn ${tab==='categories'?'active':''}" onclick="setTab('categories')">${t('tabCategories')}</button>
-          <button class="pos-tab-btn ${tab==='members'?'active':''}" onclick="setTab('members')">${t('tabMembers')}</button>
-          <button class="pos-tab-btn ${tab==='reports'?'active':''}" onclick="setTab('reports')">${t('tabReports')}</button>
-        </div>
-      </div>
-      <div class="pos-body">${renderBody()}</div>
-    `;
-    if (receiptModal) renderReceiptModal();
-    attachEvents();
-  }
-
-  function renderBody(){
-    if (tab === 'sell') return renderSell();
-    if (tab === 'products') return renderProducts();
-    if (tab === 'categories') return renderCategories();
-    if (tab === 'members') return renderMembers();
-    return renderReports();
-  }
-
-  function renderSell(){
-    const cur = t('currency');
-    let filtered = products.filter(p => (activeCategory==='ทั้งหมด' || p.category===activeCategory));
-    if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || (p.barcode && p.barcode === q));
+    function save() {
+        localStorage.setItem('pos-products-v2', JSON.stringify(products));
+        localStorage.setItem('pos-members-v2', JSON.stringify(members));
+        localStorage.setItem('pos-sales-v2', JSON.stringify(sales));
+        localStorage.setItem('pos-shop-qr', shopQr);
     }
 
-    return `
-      <div class="mode-bar">
-        <div class="mode-toggle">
-          <button class="mode-btn retail ${saleMode==='retail'?'active':''}" onclick="setMode('retail')">${t('retail')}</button>
-          <button class="mode-btn wholesale ${saleMode==='wholesale'?'active':''}" onclick="setMode('wholesale')">${t('wholesale')}</button>
-        </div>
-        <div class="customer-select">
-          <select id="member-select" onchange="setMember(this.value)">
-            <option value="">${t('walkIn')}</option>
-            ${members.map(m=>`<option value="${m.id}" ${selectedMemberId===m.id?'selected':''}>${m.name}</option>`).join('')}
-          </select>
-          ${selectedMemberId ? `<span class="member-badge">${t('memberBadge')}</span>` : ''}
-        </div>
-      </div>
-      <div class="sell-grid">
-        <div>
-          <input type="text" class="sell-search" id="search-input" placeholder="${t('search')}" value="${searchQuery}" autofocus>
-          <div class="cat-scroll">
-            ${['ทั้งหมด', ...categories].map(c=>`<button class="cat-chip ${c===activeCategory?'active':''}" onclick="setCat('${c}')">${c}</button>`).join('')}
-          </div>
-          <div class="product-grid">
-            ${filtered.map(p => `
-              <div class="product-card" onclick="addToCart('${p.id}')">
-                <div class="p-img-box"><img src="${p.img || 'https://via.placeholder.com/150?text=No+Image'}"></div>
-                <div class="p-info-box">
-                  <div class="pname">${p.name}</div>
-                  <div class="pprice">${cur}${priceFor(p).toLocaleString()}</div>
-                  <div style="font-size:10px; color:var(--ink-soft);">${t('stockLeft')}: ${p.stock}</div>
+    function setTab(tab) {
+        currentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-' + tab).classList.add('active');
+        render();
+    }
+
+    function setLang(l) { currentLang = l; render(); }
+
+    function getPrice(p) {
+        const isMem = !!selectedMemberId;
+        return isMem ? (p.priceRetailMember || 0) : (p.priceRetailGeneral || 0);
+    }
+
+    // --- Core UI Renderers ---
+
+    function render() {
+        const view = document.getElementById('main-view');
+        if (currentTab === 'sell') renderSell(view);
+        else if (currentTab === 'stock') renderStock(view);
+        else if (currentTab === 'members') renderMembers(view);
+        else if (currentTab === 'reports') renderReports(view);
+    }
+
+    function renderSell(el) {
+        let filtered = products.filter(p => p.name.includes(searchQuery) || (p.barcode && p.barcode === searchQuery));
+        
+        el.innerHTML = `
+            <div class="sell-grid">
+                <div class="product-area">
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="sell-search" placeholder="${t('search')}" value="${searchQuery}" style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);">
+                        <select id="sel-member" onchange="setMember(this.value)" style="padding:10px; border-radius:10px;">
+                            <option value="">-- ${t('search')} --</option>
+                            ${members.map(m => `<option value="${m.id}" ${selectedMemberId===m.id?'selected':''}>${m.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="product-grid">
+                        ${filtered.map(p => `
+                            <div class="p-card" onclick="addToCart('${p.id}')">
+                                <img src="${p.img || 'https://via.placeholder.com/150?text=No+Image'}" class="p-img">
+                                <div class="p-info">
+                                    <div class="p-name">${p.name}</div>
+                                    <div class="p-price">฿${getPrice(p).toLocaleString()}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-        <div class="receipt-wrap">
-          <div class="receipt">
-            <div class="receipt-head"><div class="display">${t('receiptTitle')}</div></div>
-            <div class="cart-list">
-              ${cart.map(c=>`
-                <div class="cart-row">
-                  <div style="flex:1;"><div class="cname">${c.name}</div><div class="cline">${cur}${c.price}</div></div>
-                  <input type="number" class="qty-input-inline" value="${c.qty}" onchange="updateQty('${c.id}', this.value)">
-                  <button onclick="rmCart('${c.id}')" style="color:var(--brick); margin-left:5px;">✕</button>
+                <div class="cart-panel">
+                    <div style="padding:15px; font-weight:bold; border-bottom:1px solid var(--line);">ตะกร้าสินค้า</div>
+                    <div class="cart-list">
+                        ${cart.map(item => `
+                            <div class="cart-item">
+                                <div><div style="font-size:14px;">${item.name}</div><div style="font-size:12px; color:var(--primary);">฿${item.price}</div></div>
+                                <input type="number" class="qty-input" value="${item.qty}" onchange="updateQty('${item.id}', this.value)">
+                                <button onclick="rmCart('${item.id}')" style="border:none; background:none; color:red;">✕</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="cart-summary">
+                        <div style="display:flex; justify-content:space-between; font-size:20px; font-weight:bold; margin-bottom:15px;">
+                            <span>${t('total')}</span>
+                            <span style="color:var(--primary);">฿${cart.reduce((s,i)=>s+(i.price*i.qty),0).toLocaleString()}</span>
+                        </div>
+                        <button onclick="showPayModal()" style="width:100%; padding:15px; border-radius:10px; border:none; background:var(--primary); color:white; font-weight:bold; font-size:18px;">${t('pay')}</button>
+                    </div>
                 </div>
-              `).join(cart.length?'':'<div class="cart-empty">'+t('emptyCart')+'</div>')}
             </div>
-            <div class="receipt-totals">
-               <div class="row grand"><span>${t('grandTotal')}</span><span>${cur}${cart.reduce((s,i)=>s+(i.price*i.qty),0).toLocaleString()}</span></div>
-               <div class="cash-row"><label>${t('cashReceived')}</label><input type="number" id="cash-input" value="${cashInput}" oninput="setCash(this.value)"></div>
+        `;
+        const input = document.getElementById('sell-search');
+        input.focus();
+        input.oninput = (e) => { searchQuery = e.target.value; render(); input.focus(); };
+    }
+
+    function renderStock(el) {
+        el.innerHTML = `
+            <div style="padding:20px; overflow-y:auto; width:100%;">
+                <div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px;">
+                    <h3>เพิ่ม/แก้ไขสินค้า</h3>
+                    <form id="prod-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
+                        <input type="text" name="name" placeholder="ชื่อสินค้า *" required style="padding:8px;">
+                        <input type="text" name="barcode" placeholder="บาร์โค้ด">
+                        <input type="text" name="img" placeholder="URL รูปภาพ (Google)">
+                        <input type="number" name="prG" placeholder="ราคาปลีกทั่วไป">
+                        <input type="number" name="prM" placeholder="ราคาปลีกสมาชิก">
+                        <input type="number" name="stock" placeholder="สต็อก">
+                        <button type="submit" style="background:var(--primary); color:white; border:none; border-radius:5px;">บันทึก</button>
+                    </form>
+                </div>
+                <button onclick="printBatchTags()" style="margin-bottom:10px; padding:10px; background:var(--gold); border:none; border-radius:5px;">พิมพ์ป้ายที่เลือก (${tagQueue.length})</button>
+                <table class="data-table">
+                    <thead><tr><th>เลือก</th><th>สินค้า</th><th>บาร์โค้ด</th><th>ราคา</th><th>สต็อก</th><th>จัดการ</th></tr></thead>
+                    <tbody>
+                        ${products.map(p => `
+                            <tr>
+                                <td><input type="checkbox" onchange="toggleTagQueue('${p.id}')" ${tagQueue.includes(p.id)?'checked':''}></td>
+                                <td>${p.name}</td>
+                                <td>${p.barcode || '-'}</td>
+                                <td>${p.priceRetailGeneral || 0}</td>
+                                <td>${p.stock || 0}</td>
+                                <td><button onclick="delProduct('${p.id}')" style="color:red; background:none; border:none;">ลบ</button></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
             </div>
-            <button class="checkout-btn" onclick="doCheckout()" ${cart.length===0?'disabled':''}>${t('checkout')}</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderProducts(){
-    const editing = productFormEdit ? products.find(p=>p.id===productFormEdit) : null;
-    return `
-      <div class="panel">
-        <h2>${editing ? 'แก้ไขสินค้า' : t('addProduct')}</h2>
-        <form onsubmit="saveProduct(event)">
-          <div class="form-grid">
-            <div class="field"><label>${t('barcode')}</label><input type="text" name="barcode" value="${editing?.barcode||''}"></div>
-            <div class="field"><label>ชื่อสินค้า</label><input type="text" name="name" required value="${editing?.name||''}"></div>
-            <div class="field"><label>${t('imgUrl')}</label><input type="text" name="img" value="${editing?.img||''}"></div>
-            <div class="field"><label>หมวดหมู่</label><select name="category">${categories.map(c=>`<option value="${c}" ${editing?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
-            <div class="field"><label>ราคาปลีก (ทั่วไป)</label><input type="number" name="prG" value="${editing?.priceRetailGeneral||''}"></div>
-            <div class="field"><label>ราคาปลีก (สมาชิก)</label><input type="number" name="prM" value="${editing?.priceRetailMember||''}"></div>
-            <div class="field"><label>สต็อก</label><input type="number" name="stock" value="${editing?.stock||0}"></div>
-            <div class="field"><label>หน่วย</label><input type="text" name="unit" value="${editing?.unit||'ชิ้น'}"></div>
-          </div>
-          <button type="submit" class="form-submit" style="margin-top:10px;">บันทึก</button>
-        </form>
-      </div>
-      <div class="panel">
-        <table class="data-table">
-          <thead><tr><th>สินค้า</th><th>ราคา</th><th>สต็อก</th><th>จัดการ</th></tr></thead>
-          <tbody>
-            ${products.map(p => `
-              <tr>
-                <td>${p.name}</td>
-                <td>${p.priceRetailGeneral}</td>
-                <td>${p.stock}</td>
-                <td>
-                  <button onclick="editP('${p.id}')">แก้ไข</button>
-                  <button onclick="printSingleTag('${p.id}')">ป้ายราคา</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
-  // --- Functions ---
-  window.setTab = (v) => { tab = v; render(); };
-  window.setLang = (v) => { lang = v; render(); };
-  window.setCat = (v) => { activeCategory = v; render(); };
-  window.setMode = (v) => { saleMode = v; recalculateCart(); render(); };
-  window.setMember = (v) => { selectedMemberId = v; recalculateCart(); render(); };
-  window.setCash = (v) => { cashInput = v; };
-  
-  window.addToCart = (id) => {
-    const p = products.find(x => x.id === id);
-    const has = cart.find(x => x.id === id);
-    if(has) has.qty++;
-    else cart.push({id: p.id, name: p.name, price: priceFor(p), qty: 1});
-    render();
-  };
-  window.updateQty = (id, v) => {
-    const item = cart.find(x => x.id === id);
-    if(item) { item.qty = parseInt(v) || 1; render(); }
-  };
-  window.rmCart = (id) => { cart = cart.filter(x => x.id !== id); render(); };
-
-  function recalculateCart(){
-    cart = cart.map(item => {
-        const p = products.find(x => x.id === item.id);
-        if(p) return {...item, price: priceFor(p)};
-        return item;
-    });
-  }
-
-  window.saveProduct = (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const np = {
-        id: productFormEdit || 'p-'+Date.now(),
-        name: fd.get('name'),
-        barcode: fd.get('barcode'),
-        img: fd.get('img'),
-        category: fd.get('category'),
-        priceRetailGeneral: parseFloat(fd.get('prG')) || 0,
-        priceRetailMember: parseFloat(fd.get('prM')) || 0,
-        stock: parseInt(fd.get('stock')) || 0,
-        unit: fd.get('unit')
-    };
-    if(productFormEdit) products = products.map(p => p.id === productFormEdit ? np : p);
-    else products.push(np);
-    productFormEdit = null;
-    saveAll(); render();
-  };
-
-  window.editP = (id) => { productFormEdit = id; render(); };
-
-  window.printSingleTag = (id) => {
-    const p = products.find(x => x.id === id);
-    const portal = document.getElementById('print-tag-portal');
-    portal.innerHTML = `
-      <div class="tag-item">
-        <div class="tag-name">${p.name}</div>
-        <div class="tag-price">฿${p.priceRetailGeneral.toLocaleString()}</div>
-        <svg id="bc-tag"></svg>
-      </div>
-    `;
-    if(p.barcode) JsBarcode("#bc-tag", p.barcode, { height: 30, fontSize: 12 });
-    window.print();
-  };
-
-  window.doCheckout = () => {
-    const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
-    const cash = parseFloat(cashInput) || 0;
-    if(cash < total) return alert('เงินรับมาไม่พอ');
-    const sale = { ts: new Date().toISOString(), total, items: [...cart], cash, change: cash - total };
-    sales.push(sale);
-    cart.forEach(c => {
-        const p = products.find(x => x.id === c.id);
-        if(p) p.stock -= c.qty;
-    });
-    cart = []; cashInput = '';
-    saveAll(); alert('สำเร็จ!'); render();
-  };
-
-  function attachEvents(){
-    const sin = document.getElementById('search-input');
-    if(sin) {
-        sin.oninput = (e) => { searchQuery = e.target.value; render(); document.getElementById('search-input').focus(); };
-        sin.onkeypress = (e) => {
-            if(e.key === 'Enter') {
-                const p = products.find(x => x.barcode === sin.value);
-                if(p) { addToCart(p.id); searchQuery = ''; render(); }
-            }
+        `;
+        document.getElementById('prod-form').onsubmit = (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            products.push({
+                id: 'p-' + Date.now(),
+                name: fd.get('name'),
+                barcode: fd.get('barcode'),
+                img: fd.get('img'),
+                priceRetailGeneral: parseFloat(fd.get('prG')) || 0,
+                priceRetailMember: parseFloat(fd.get('prM')) || 0,
+                stock: parseFloat(fd.get('stock')) || 0
+            });
+            save(); render();
         };
     }
-  }
 
-  // Fallback สำหรับหน้าอื่นๆ
-  function renderCategories() { return `<div class="panel">หน้าหมวดหมู่สินค้า (คงเดิมตามไฟล์ต้นฉบับของคุณ)</div>`; }
-  function renderMembers() { return `<div class="panel">หน้ารายชื่อสมาชิก (คงเดิมตามไฟล์ต้นฉบับของคุณ)</div>`; }
-  function renderReports() { return `<div class="panel">หน้าสรุปรายงาน (คงเดิมตามไฟล์ต้นฉบับของคุณ)</div>`; }
+    function renderReports(el) {
+        el.innerHTML = `
+            <div style="padding:20px; width:100%;">
+                <div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px; border:2px solid var(--gold);">
+                    <h3><i class="fa fa-qrcode"></i> ตั้งค่า QR Code ร้านค้า (โอนเงิน)</h3>
+                    <p style="font-size:12px; color:var(--ink-soft);">อัปโหลด QR Code ของคุณที่นี่ รูปจะถูกบันทึกไว้ใช้ถาวร</p>
+                    <input type="file" accept="image/*" onchange="handleQrUpload(this)" style="margin-bottom:10px;">
+                    <div style="width:150px; height:150px; background:#f0f0f0; border:2px dashed #ccc;">
+                        ${shopQr ? `<img src="${shopQr}" style="width:100%; height:100%; object-fit:contain;">` : '<div style="padding:40px 10px; font-size:10px;">ยังไม่มี QR</div>'}
+                    </div>
+                </div>
+                <h3>รายการขายล่าสุด</h3>
+                <div style="background:white; border-radius:15px; overflow:hidden;">
+                    <table class="data-table">
+                        ${sales.slice().reverse().slice(0, 10).map(s => `
+                            <tr><td>${new Date(s.ts).toLocaleString()}</td><td>฿${s.total.toLocaleString()}</td></tr>
+                        `).join('')}
+                    </table>
+                </div>
+            </div>
+        `;
+    }
 
-  (async function init(){
-    await loadData();
+    function renderMembers(el) {
+        el.innerHTML = `
+            <div style="padding:20px; width:100%;">
+                <div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px;">
+                    <h3>เพิ่มสมาชิก</h3>
+                    <form id="mem-form" style="display:flex; gap:10px;">
+                        <input type="text" name="name" placeholder="ชื่อสมาชิก" required style="flex:1; padding:8px;">
+                        <input type="text" name="phone" placeholder="เบอร์โทร" style="padding:8px;">
+                        <button type="submit" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:5px;">เพิ่ม</button>
+                    </form>
+                </div>
+                <table class="data-table">
+                    ${members.map(m => `<tr><td>${m.name}</td><td>${m.phone}</td><td><button onclick="delMember('${m.id}')">ลบ</button></td></tr>`).join('')}
+                </table>
+            </div>
+        `;
+        document.getElementById('mem-form').onsubmit = (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            members.push({ id: 'm-' + Date.now(), name: fd.get('name'), phone: fd.get('phone') });
+            save(); render();
+        };
+    }
+
+    // --- Functions ---
+    window.addToCart = (id) => {
+        const p = products.find(x => x.id === id);
+        const has = cart.find(x => x.id === id);
+        if(has) has.qty++;
+        else cart.push({ id: p.id, name: p.name, price: getPrice(p), qty: 1 });
+        render();
+    };
+    window.updateQty = (id, v) => {
+        const item = cart.find(x => x.id === id);
+        if(item) { item.qty = parseFloat(v) || 1; render(); }
+    };
+    window.rmCart = (id) => { cart = cart.filter(x => x.id !== id); render(); };
+    window.setMember = (id) => {
+        selectedMemberId = id;
+        cart = cart.map(item => {
+            const p = products.find(x => x.id === item.id);
+            return p ? { ...item, price: getPrice(p) } : item;
+        });
+        render();
+    };
+
+    window.handleQrUpload = (input) => {
+        const file = input.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            shopQr = e.target.result;
+            save(); render();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    window.showPayModal = () => {
+        if(!cart.length) return;
+        const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2>ยอดชำระ: ฿${total.toLocaleString()}</h2>
+                ${shopQr ? `
+                    <p style="color:var(--primary); font-weight:bold;">${t('transfer')}</p>
+                    <div class="qr-display"><img src="${shopQr}"></div>
+                ` : '<p style="font-size:12px; color:red;">* ยังไม่ได้ตั้งค่า QR ร้านค้า</p>'}
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button onclick="this.parentElement.parentElement.parentElement.remove()" style="flex:1; padding:10px; border:none; background:#eee; border-radius:10px;">ยกเลิก</button>
+                    <button onclick="completeSale()" style="flex:2; padding:10px; border:none; background:var(--primary); color:white; border-radius:10px; font-weight:bold;">${t('checkout')}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    };
+
+    window.completeSale = () => {
+        const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
+        sales.push({ ts: new Date().toISOString(), total, items: [...cart], memberId: selectedMemberId });
+        cart.forEach(c => {
+            const p = products.find(x => x.id === c.id);
+            if(p) p.stock -= c.qty;
+        });
+        cart = []; selectedMemberId = ''; 
+        save();
+        document.querySelectorAll('.modal').forEach(m => m.remove());
+        render();
+    };
+
+    window.toggleTagQueue = (id) => {
+        if(tagQueue.includes(id)) tagQueue = tagQueue.filter(x => x !== id);
+        else tagQueue.push(id);
+    };
+
+    window.printBatchTags = () => {
+        if(!tagQueue.length) return alert('กรุณาเลือกสินค้า');
+        const area = document.getElementById('print-area');
+        area.innerHTML = tagQueue.map(id => {
+            const p = products.find(x => x.id === id);
+            return `
+                <div class="price-tag">
+                    <div style="font-size:10px; font-weight:bold;">${p.name}</div>
+                    <div style="font-size:18px; font-weight:900;">฿${(p.priceRetailGeneral||0).toLocaleString()}</div>
+                    <svg class="tag-bc" id="bc-${p.id}"></svg>
+                </div>
+            `;
+        }).join('');
+        tagQueue.forEach(id => {
+            const p = products.find(x => x.id === id);
+            if(p.barcode) JsBarcode("#bc-"+p.id, p.barcode, { height: 30, displayValue: true, fontSize: 10 });
+        });
+        setTimeout(() => { window.print(); tagQueue = []; render(); }, 500);
+    };
+
+    window.delProduct = (id) => { if(confirm('ลบ?')) { products = products.filter(x => x.id !== id); save(); render(); } };
+    window.delMember = (id) => { if(confirm('ลบ?')) { members = members.filter(x => x.id !== id); save(); render(); } };
+
+    // Start App
     render();
-  })();
-})();
 </script>
+
 </body>
 </html>
