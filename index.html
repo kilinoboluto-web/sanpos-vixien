@@ -1,389 +1,354 @@
---- START OF FILE text/html ---
 
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
 
-#pos-root {
-  --paper: #F8FAFB;
-  --surface: #FFFFFF;
-  --primary: #1B4332; /* เขียวเข้มดูแพง */
-  --primary-light: #40916C;
-  --accent: #D4A373; /* ทองนวล */
-  --ink: #2D3436;
-  --ink-soft: #636E72;
-  --line: #E1E8ED;
-  --bg-gradient: linear-gradient(135deg, #F8FAFB 0%, #E9ECEF 100%);
-  
-  font-family: 'Sarabun', sans-serif;
-  color: var(--ink);
-  background: var(--bg-gradient);
-  min-height: 100vh;
-  padding: 20px;
+:root {
+  --primary: #004445;
+  --primary-dark: #002d2e;
+  --accent: #feb300;
+  --accent-soft: #fff4d1;
+  --bg: #f4f7f6;
+  --surface: #ffffff;
+  --ink: #2c3e50;
+  --ink-soft: #7f8c8d;
+  --line: #e0e6e8;
+  --danger: #e74c3c;
+  --success: #27ae60;
 }
 
-/* UI: Tab Bar ใหม่ */
-.pos-nav {
-  display: flex;
-  background: var(--primary);
-  padding: 8px;
-  border-radius: 16px;
-  gap: 8px;
-  margin-bottom: 25px;
-  box-shadow: 0 8px 20px rgba(27,67,50,0.15);
-  overflow-x: auto;
+body {
+  margin: 0;
+  font-family: 'Sarabun', sans-serif;
+  background-color: var(--bg);
+  color: var(--ink);
 }
-.nav-btn {
-  padding: 12px 20px;
-  border-radius: 12px;
-  color: rgba(255,255,255,0.7);
-  background: transparent;
-  font-weight: 600;
+
+#pos-root {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+/* Sidebar Design */
+.sidebar {
+  background: var(--primary-dark);
+  color: white;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+}
+.sidebar-header {
+  padding: 0 25px 30px;
+  text-align: center;
+}
+.sidebar-header h1 {
+  font-family: 'Kanit', sans-serif;
+  font-size: 22px;
+  margin: 0;
+  color: var(--accent);
+}
+.nav-menu {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.nav-item {
+  padding: 14px 25px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
-  white-space: nowrap;
+  gap: 12px;
+  font-weight: 500;
   transition: 0.3s;
+  color: rgba(255,255,255,0.7);
+  border-left: 4px solid transparent;
 }
-.nav-btn i { font-size: 18px; }
-.nav-btn.active { background: var(--surface); color: var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.nav-item:hover {
+  background: rgba(255,255,255,0.05);
+  color: white;
+}
+.nav-item.active {
+  background: rgba(254, 179, 0, 0.1);
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
 
-/* UI: Product Card & Image */
-.product-card {
+/* Content Area */
+.main-content {
+  padding: 25px;
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+/* Product Cards */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+.card {
   background: var(--surface);
-  border-radius: 15px;
-  border: 1px solid var(--line);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
   transition: 0.3s;
-  cursor: pointer;
+  border: 1px solid var(--line);
   position: relative;
 }
-.product-card:hover { transform: translateY(-5px); border-color: var(--primary-light); box-shadow: 0 10px 20px rgba(0,0,0,0.05); }
-.p-img { width: 100%; height: 120px; object-fit: cover; background: #f0f0f0; }
-.p-info { padding: 12px; }
+.card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+.card-img { width: 100%; height: 130px; object-fit: cover; background: #eee; }
+.card-body { padding: 12px; }
+.card-title { font-weight: 600; font-size: 15px; margin-bottom: 5px; color: var(--primary-dark); }
+.card-price { font-weight: 700; color: var(--primary); font-family: 'IBM Plex Mono'; font-size: 16px; }
 
-/* ระบบตะกร้าใหม่ */
-.cart-qty-input {
-  width: 50px;
-  padding: 4px;
-  border: 1.5px solid var(--line);
-  border-radius: 6px;
+/* Cart Styling */
+.cart-panel {
+  background: white;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  border: 1px solid var(--line);
+}
+.cart-header { padding: 20px; border-bottom: 1px solid var(--line); font-weight: 700; font-size: 18px; }
+.cart-list { flex: 1; overflow-y: auto; padding: 15px; }
+.cart-item {
+  display: grid;
+  grid-template-columns: 1fr 60px 40px;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f9f9f9;
+}
+.qty-input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   text-align: center;
   font-weight: 700;
-  font-family: 'IBM Plex Mono';
+  background: var(--bg);
 }
 
-/* ป้ายราคา Print Layout */
+/* Utilities */
+.btn-primary { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: 600; cursor: pointer; width: 100%; font-size: 16px; }
+.btn-primary:hover { background: var(--primary-dark); }
+.badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.badge-gold { background: var(--accent-soft); color: #8a6d3b; }
+
+/* Print Layout */
 @media print {
-  body * { visibility: hidden; }
-  #print-area, #print-area * { visibility: visible; }
-  #print-area { position: absolute; left: 0; top: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-  .price-tag { 
-    width: 45mm; height: 30mm; border: 1px solid #000; 
-    padding: 2mm; display: flex; flex-direction: column; 
-    align-items: center; justify-content: center; text-align: center;
+  #pos-root { display: none; }
+  #print-area { display: flex; flex-wrap: wrap; gap: 5px; }
+  .price-tag {
+    width: 45mm; height: 30mm; border: 0.5px solid #000;
+    padding: 2mm; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    box-sizing: border-box; text-align: center;
   }
-  .tag-name { font-size: 10pt; font-weight: bold; overflow: hidden; height: 1.2em; }
-  .tag-price { font-size: 14pt; font-weight: 900; }
-  .barcode-svg { max-width: 90%; height: 10mm; }
+  .tag-name { font-size: 10pt; font-weight: bold; margin-bottom: 2px; height: 2.4em; overflow: hidden; }
+  .tag-price { font-size: 15pt; font-weight: 900; margin-bottom: 2px; }
+  .tag-bc { height: 10mm; width: 100%; }
 }
-
-.hidden { display: none; }
 </style>
 
 <div id="pos-root">
-  <!-- Nav Bar -->
-  <div class="pos-nav">
-    <button class="nav-btn active" data-tab="sell"><i class="fa-solid fa-cash-register"></i> <span class="t-sell">ขาย</span></button>
-    <button class="nav-btn" data-tab="products"><i class="fa-solid fa-boxes-stacked"></i> <span class="t-products">สต็อก</span></button>
-    <button class="nav-btn" data-tab="print-tags"><i class="fa-solid fa-print"></i> <span class="t-tags">พิมพ์ป้ายราคา</span></button>
-    <button class="nav-btn" data-tab="members"><i class="fa-solid fa-users"></i> <span class="t-members">สมาชิก</span></button>
-    <button class="nav-btn" data-tab="reports"><i class="fa-solid fa-chart-line"></i> <span class="t-reports">สรุป</span></button>
-  </div>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>SAN POS PRO</h1>
+      <div style="font-size: 12px; opacity: 0.6; margin-top: 5px;" id="live-clock"></div>
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-item active" data-tab="sell"><i class="fa-solid fa-cart-shopping"></i> รายการขาย</div>
+      <div class="nav-item" data-tab="stock"><i class="fa-solid fa-box"></i> สต็อกสินค้า</div>
+      <div class="nav-item" data-tab="tags"><i class="fa-solid fa-print"></i> พิมพ์ป้ายราคา</div>
+      <div class="nav-item" data-tab="members"><i class="fa-solid fa-user-group"></i> สมาชิก</div>
+      <div class="nav-item" data-tab="reports"><i class="fa-solid fa-chart-line"></i> รายงานยอดขาย</div>
+    </nav>
+    <div style="padding: 20px; font-size: 11px; opacity: 0.5; text-align: center;">v2.5.0 Premium</div>
+  </aside>
 
-  <div id="main-content">
-    <!-- เนื้อหาจะถูกเรนเดอร์ตรงนี้ -->
-  </div>
+  <main class="main-content" id="view-port"></main>
 </div>
 
-<!-- พื้นที่พิมพ์ป้าย (จะเห็นเฉพาะตอนสั่งพิมพ์) -->
 <div id="print-area"></div>
 
-<!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 
 <script>
 (function(){
-  // --- Data State ---
-  let products = JSON.parse(localStorage.getItem('san_pos_prods') || '[]');
-  let members = JSON.parse(localStorage.getItem('san_pos_members') || '[]');
-  let sales = JSON.parse(localStorage.getItem('san_pos_sales') || '[]');
+  // --- Data Loading (ใช้ Key เดิมเพื่อให้ข้อมูลไม่หาย) ---
+  let products = JSON.parse(localStorage.getItem('pos-products-v2') || '[]');
+  let members = JSON.parse(localStorage.getItem('pos-members-v2') || '[]');
+  let sales = JSON.parse(localStorage.getItem('pos-sales-v2') || '[]');
+  let categories = JSON.parse(localStorage.getItem('pos-categories-v2') || '[]');
+  
   let cart = [];
   let currentTab = 'sell';
-  let saleMode = 'retail';
+  let activeCat = 'ทั้งหมด';
   let selectedMemberId = '';
-  let printQueue = [];
+  let searchQ = '';
+  let tagQueue = [];
 
-  // --- Logic ---
   const save = () => {
-    localStorage.setItem('san_pos_prods', JSON.stringify(products));
-    localStorage.setItem('san_pos_members', JSON.stringify(members));
-    localStorage.setItem('san_pos_sales', JSON.stringify(sales));
+    localStorage.setItem('pos-products-v2', JSON.stringify(products));
+    localStorage.setItem('pos-members-v2', JSON.stringify(members));
+    localStorage.setItem('pos-sales-v2', JSON.stringify(sales));
   };
 
-  const priceFor = (p) => {
-    const isMem = !!selectedMemberId;
-    if (saleMode === 'retail') return isMem ? (p.priceRM || 0) : (p.priceRG || 0);
-    return isMem ? (p.priceWM || 0) : (p.priceWG || 0);
+  const getPrice = (p) => {
+    const isMember = !!selectedMemberId;
+    return isMember ? (p.priceRetailMember || 0) : (p.priceRetailGeneral || 0);
   };
 
-  // ฟังก์ชันสำคัญ: อัปเดตราคาทั้งตะกร้าเมื่อเปลี่ยนสมาชิก/โหมด
-  const syncCartPrices = () => {
-    cart = cart.map(item => {
-      const p = products.find(x => x.id === item.id);
-      return p ? { ...item, price: priceFor(p) } : item;
-    });
-    render();
-  };
-
-  // --- UI Renderers ---
   const render = () => {
-    const main = document.getElementById('main-content');
-    if (currentTab === 'sell') renderSell(main);
-    if (currentTab === 'products') renderProducts(main);
-    if (currentTab === 'print-tags') renderPrintTags(main);
-    if (currentTab === 'members') renderMembers(main);
-    if (currentTab === 'reports') renderReports(main);
+    const port = document.getElementById('view-port');
+    if (currentTab === 'sell') renderSell(port);
+    if (currentTab === 'stock') renderStock(port);
+    if (currentTab === 'tags') renderTags(port);
+    if (currentTab === 'members') renderMembers(port);
+    if (currentTab === 'reports') renderReports(port);
   };
 
-  // หน้าขายสินค้า
-  const renderSell = (container) => {
-    container.innerHTML = `
-      <div style="display:grid; grid-template-columns: 1fr 350px; gap:20px;">
+  // --- UI Sections ---
+
+  function renderSell(el) {
+    let filtered = products.filter(p => (activeCat === 'ทั้งหมด' || p.category === activeCat));
+    if(searchQ) filtered = filtered.filter(p => p.name.includes(searchQ) || p.barcode === searchQ);
+
+    el.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 380px; gap: 25px; height: calc(100vh - 50px);">
         <div>
-          <div style="display:flex; gap:10px; margin-bottom:15px;">
-             <input type="text" id="search-input" placeholder="สแกนบาร์โค้ด หรือ ค้นหาชื่อสินค้า..." style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);">
-             <select id="mem-select" style="padding:10px; border-radius:10px;">
-               <option value="">-- ลูกค้าทั่วไป --</option>
-               ${members.map(m => `<option value="${m.id}" ${selectedMemberId===m.id?'selected':''}>${m.name}</option>`).join('')}
-             </select>
+          <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <div style="position:relative; flex:1;">
+              <i class="fa-solid fa-search" style="position:absolute; left:15px; top:15px; color:#ccc;"></i>
+              <input type="text" id="search-in" value="${searchQ}" placeholder="ค้นหาชื่อสินค้า หรือ สแกนบาร์โค้ด..." style="width:100%; padding:14px 14px 14px 45px; border-radius:15px; border:1px solid var(--line); font-size:15px;">
+            </div>
+            <select id="mem-sel" style="padding:10px; border-radius:15px; border:1px solid var(--line); width:180px;">
+              <option value="">-- ลูกค้าทั่วไป --</option>
+              ${members.map(m => `<option value="${m.id}" ${selectedMemberId===m.id?'selected':''}>${m.name}</option>`).join('')}
+            </select>
           </div>
-          <div id="product-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:15px;">
-            ${products.map(p => `
-              <div class="product-card" onclick="addToCart('${p.id}')">
-                <img src="${p.img || 'https://via.placeholder.com/150?text=No+Image'}" class="p-img">
-                <div class="p-info">
-                  <div style="font-weight:600; font-size:14px;">${p.name}</div>
-                  <div style="color:var(--primary); font-weight:700;">฿${priceFor(p).toLocaleString()}</div>
-                  <div style="font-size:11px; color:var(--ink-soft);">สต็อก: ${p.stock} ${p.unit}</div>
+          
+          <div style="display:flex; gap:10px; overflow-x:auto; padding-bottom:15px; margin-bottom:15px;">
+             ${['ทั้งหมด', ...categories].map(c => `<button onclick="setCat('${c}')" style="padding:8px 18px; border-radius:20px; border:none; background:${activeCat===c?'var(--primary)':'white'}; color:${activeCat===c?'white':'var(--ink)'}; cursor:pointer; white-space:nowrap; box-shadow:0 2px 5px rgba(0,0,0,0.05); font-weight:600;">${c}</button>`).join('')}
+          </div>
+
+          <div class="product-grid">
+            ${filtered.map(p => `
+              <div class="card" onclick="addToCart('${p.id}')">
+                <img src="${p.img || 'https://via.placeholder.com/200x130?text=No+Image'}" class="card-img">
+                <div class="card-body">
+                  <div class="card-title">${p.name}</div>
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="card-price">฿${getPrice(p).toLocaleString()}</span>
+                    <span style="font-size:11px; color:var(--ink-soft);">สต็อก: ${p.stock}</span>
+                  </div>
                 </div>
               </div>
             `).join('')}
           </div>
         </div>
-        
-        <div style="background:white; border-radius:15px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.05); height:fit-content;">
-          <h3 style="margin-top:0; border-bottom:2px solid var(--line); padding-bottom:10px;">รายการขาย</h3>
-          <div id="cart-items" style="max-height:400px; overflow-y:auto; margin-bottom:15px;">
+
+        <div class="cart-panel">
+          <div class="cart-header">ตะกร้าสินค้า ${selectedMemberId ? '<span class="badge badge-gold">สมาชิก</span>' : ''}</div>
+          <div class="cart-list">
             ${cart.map(item => `
-              <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; border-bottom:1px solid #f9f9f9; padding-bottom:10px;">
-                <div style="flex:1">
-                  <div style="font-size:13px; font-weight:600;">${item.name}</div>
+              <div class="cart-item">
+                <div>
+                  <div style="font-size:14px; font-weight:600;">${item.name}</div>
                   <div style="font-size:12px; color:var(--primary);">฿${item.price.toLocaleString()}</div>
                 </div>
-                <input type="number" class="cart-qty-input" value="${item.qty}" onchange="updateQty('${item.id}', this.value)">
-                <button onclick="removeFromCart('${item.id}')" style="background:none; border:none; color:red; cursor:pointer;">✕</button>
+                <input type="number" class="qty-input" value="${item.qty}" onchange="updateQty('${item.id}', this.value)">
+                <button onclick="rmCart('${item.id}')" style="color:var(--danger); border:none; background:none; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button>
               </div>
-            `).join(cart.length ? '' : '<div style="text-align:center; color:#ccc; padding:20px;">ไม่มีสินค้าในตะกร้า</div>')}
+            `).join(cart.length ? '' : '<div style="text-align:center; padding:50px; color:#ccc;"><i class="fa-solid fa-basket-shopping fa-3x"></i><p>แตะสินค้าเพื่อเริ่มการขาย</p></div>')}
           </div>
-          <div style="font-size:20px; font-weight:800; display:flex; justify-content:space-between;">
-            <span>รวมทั้งสิ้น:</span>
-            <span style="color:var(--primary);">฿${cart.reduce((a,b)=>a+(b.price*b.qty),0).toLocaleString()}</span>
+          <div style="padding:20px; background:#fcfcfc; border-top:1px solid var(--line); border-radius:0 0 20px 20px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:18px; font-weight:800;">
+              <span>ยอดรวม</span>
+              <span style="color:var(--primary);">฿${cart.reduce((s,i)=>s+(i.price*i.qty),0).toLocaleString()}</span>
+            </div>
+            <button class="btn-primary" onclick="checkout()">ชำระเงิน (F10)</button>
           </div>
-          <button onclick="checkout()" style="width:100%; margin-top:20px; padding:15px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:700; font-size:16px; cursor:pointer;">ชำระเงิน</button>
         </div>
       </div>
     `;
+    
+    const sin = document.getElementById('search-in');
+    sin.focus(); sin.oninput = (e) => { searchQ = e.target.value; render(); sin.focus(); };
+    document.getElementById('mem-sel').onchange = (e) => { 
+      selectedMemberId = e.target.value; 
+      // อัปเดตราคาทั้งตะกร้าตามสมาชิกที่เลือก
+      cart = cart.map(i => {
+        const p = products.find(x => x.id === i.id);
+        return p ? {...i, price: getPrice(p)} : i;
+      });
+      render(); 
+    };
+  }
 
-    // Event: ค้นหา/สแกนบาร์โค้ด
-    document.getElementById('search-input').focus();
-    document.getElementById('search-input').addEventListener('keypress', (e) => {
-      if(e.key === 'Enter') {
-        const val = e.target.value;
-        const p = products.find(x => x.barcode === val || x.name.includes(val));
-        if(p) { addToCart(p.id); e.target.value = ''; }
-      }
-    });
-
-    document.getElementById('mem-select').addEventListener('change', (e) => {
-      selectedMemberId = e.target.value;
-      syncCartPrices();
-    });
-  };
-
-  // หน้าจัดการสินค้า (สต็อก)
-  const renderProducts = (container) => {
-    container.innerHTML = `
-      <div class="product-card" style="padding:20px; margin-bottom:20px;">
-        <h3 style="margin-top:0;">เพิ่ม/แก้ไขสินค้า</h3>
-        <form id="p-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px;">
-          <div><label>บาร์โค้ด (สแกนเอา)</label><input type="text" name="barcode" style="width:100%; padding:8px;"></div>
-          <div><label>ชื่อสินค้า *</label><input type="text" name="name" required style="width:100%; padding:8px;"></div>
-          <div><label>จำนวนสต็อก</label><input type="number" name="stock" value="0" style="width:100%; padding:8px;"></div>
-          <div><label>หน่วย (ชิ้น/แพ็ค/ห่อ)</label><input type="text" name="unit" placeholder="เช่น ชิ้น" style="width:100%; padding:8px;"></div>
-          <div><label>จำนวนบรรจุ (ต่อหน่วย)</label><input type="number" name="packQty" value="1" style="width:100%; padding:8px;"></div>
-          <div><label>URL รูปภาพ (จาก Google)</label><input type="text" name="img" placeholder="วางลิงก์รูปที่นี่..." style="width:100%; padding:8px;"></div>
-          
-          <div><label>ราคาปลีก (ทั่วไป)</label><input type="number" name="priceRG" step="any" style="width:100%; padding:8px;"></div>
-          <div><label>ราคาปลีก (สมาชิก)</label><input type="number" name="priceRM" step="any" style="width:100%; padding:8px;"></div>
-          <div><label>ราคาส่ง (ทั่วไป)</label><input type="number" name="priceWG" step="any" style="width:100%; padding:8px;"></div>
-          <div><label>ราคาส่ง (สมาชิก)</label><input type="number" name="priceWM" step="any" style="width:100%; padding:8px;"></div>
-          
-          <div style="grid-column: 1 / -1">
-            <button type="submit" style="background:var(--primary); color:white; padding:10px 20px; border:none; border-radius:5px; cursor:pointer;">บันทึกสินค้า</button>
-          </div>
+  function renderStock(el) {
+    el.innerHTML = `
+      <div style="background:white; padding:25px; border-radius:20px; margin-bottom:30px; box-shadow:0 5px 15px rgba(0,0,0,0.05);">
+        <h2 style="margin-top:0; color:var(--primary);"><i class="fa-solid fa-plus-circle"></i> เพิ่มสินค้า / แก้ไขสินค้า</h2>
+        <form id="p-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:15px;">
+          <input type="text" name="name" placeholder="ชื่อสินค้า *" required style="padding:10px; border-radius:8px; border:1px solid var(--line);">
+          <select name="category" style="padding:10px; border-radius:8px; border:1px solid var(--line);">
+             ${categories.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <input type="text" name="barcode" placeholder="บาร์โค้ด (สแกนได้)">
+          <input type="number" name="stock" placeholder="จำนวนสต็อก">
+          <input type="text" name="unit" placeholder="หน่วย (ชิ้น, แพ็ค...)">
+          <input type="text" name="img" placeholder="วาง URL รูปภาพจาก Google ที่นี่">
+          <input type="number" name="prG" step="any" placeholder="ราคาปลีก (ทั่วไป)">
+          <input type="number" name="prM" step="any" placeholder="ราคาปลีก (สมาชิก)">
+          <button type="submit" class="btn-primary">บันทึกสินค้า</button>
         </form>
       </div>
-      
-      <table style="width:100%; background:white; border-collapse:collapse; border-radius:10px; overflow:hidden;">
-        <thead style="background:#eee;">
+      <table style="width:100%; background:white; border-radius:15px; overflow:hidden; border-collapse:collapse;">
+        <thead style="background:var(--primary); color:white;">
           <tr>
-            <th style="padding:10px; text-align:left;">สินค้า</th>
-            <th>บาร์โค้ด</th>
-            <th>ราคาปลีก</th>
+            <th style="padding:15px; text-align:left;">รายการสินค้า</th>
+            <th>หมวดหมู่</th>
+            <th>ราคา</th>
             <th>สต็อก</th>
-            <th>จัดการ</th>
+            <th>การจัดการ</th>
           </tr>
         </thead>
         <tbody>
           ${products.map(p => `
             <tr style="border-bottom:1px solid #eee;">
-              <td style="padding:10px; display:flex; align-items:center; gap:10px;">
-                <img src="${p.img || ''}" style="width:40px; height:40px; object-fit:cover; border-radius:5px;">
-                ${p.name}
+              <td style="padding:12px; display:flex; align-items:center; gap:12px;">
+                <img src="${p.img||''}" style="width:45px; height:45px; object-fit:cover; border-radius:8px; background:#eee;">
+                <div>
+                  <div style="font-weight:600;">${p.name}</div>
+                  <div style="font-size:11px; color:#aaa;">${p.barcode||'ไม่มีบาร์โค้ด'}</div>
+                </div>
               </td>
-              <td align="center">${p.barcode || '-'}</td>
-              <td align="center">฿${(p.priceRG || 0).toLocaleString()}</td>
-              <td align="center">${p.stock} ${p.unit} (บรรจุ ${p.packQty})</td>
+              <td align="center">${p.category}</td>
+              <td align="center">฿${(p.priceRetailGeneral||0).toLocaleString()}</td>
+              <td align="center"><span class="badge ${p.stock<=5?'badge-danger':'badge-gold'}" style="background:${p.stock<=5?'#ffdce0':'#e3fcef'}; color:${p.stock<=5?'#e74c3c':'#27ae60'};">${p.stock} ${p.unit||''}</span></td>
               <td align="center">
-                <button onclick="editProduct('${p.id}')">แก้ไข</button>
-                <button onclick="deleteProduct('${p.id}')" style="color:red;">ลบ</button>
+                <button onclick="delP('${p.id}')" style="color:var(--danger); border:none; background:none; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
               </td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     `;
-
     document.getElementById('p-form').onsubmit = (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
-      const newP = {
-        id: Date.now().toString(),
+      const np = {
+        id: 'p-' + Date.now(),
         name: fd.get('name'),
+        category: fd.get('category'),
         barcode: fd.get('barcode'),
         stock: parseFloat(fd.get('stock')) || 0,
         unit: fd.get('unit'),
-        packQty: parseFloat(fd.get('packQty')) || 1,
         img: fd.get('img'),
-        priceRG: parseFloat(fd.get('priceRG')) || 0,
-        priceRM: parseFloat(fd.get('priceRM')) || 0,
-        priceWG: parseFloat(fd.get('priceWG')) || 0,
-        priceWM: parseFloat(fd.get('priceWM')) || 0,
-      };
-      products.push(newP);
-      save();
-      render();
-    };
-  };
-
-  // หน้าพิมพ์ป้ายราคา
-  const renderPrintTags = (container) => {
-    container.innerHTML = `
-      <div class="product-card" style="padding:20px;">
-        <h3>เลือกสินค้าที่จะพิมพ์ป้ายราคา (ติดหน้าร้าน)</h3>
-        <p style="color:var(--ink-soft);">* ขนาดป้ายถูกตั้งค่าให้ประหยัดกระดาษ (ประมาณ 4.5 x 3 ซม.)</p>
-        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:10px; margin-bottom:20px;">
-          ${products.map(p => `
-            <label style="display:flex; align-items:center; gap:10px; background:#f9f9f9; padding:10px; border-radius:8px; cursor:pointer;">
-              <input type="checkbox" onchange="togglePrintQueue('${p.id}')" ${printQueue.includes(p.id)?'checked':''}>
-              ${p.name}
-            </label>
-          `).join('')}
-        </div>
-        <button onclick="preparePrint()" style="background:var(--accent); color:white; padding:15px 30px; border:none; border-radius:10px; font-weight:700; cursor:pointer;">
-          <i class="fa-solid fa-print"></i> สั่งพิมพ์ป้ายที่เลือก (${printQueue.length})
-        </button>
-      </div>
-    `;
-  };
-
-  // --- Handlers ---
-  window.addToCart = (id) => {
-    const p = products.find(x => x.id === id);
-    if(!p) return;
-    const existing = cart.find(x => x.id === id);
-    if(existing) existing.qty++;
-    else cart.push({ id: p.id, name: p.name, price: priceFor(p), qty: 1 });
-    render();
-  };
-
-  window.updateQty = (id, val) => {
-    const item = cart.find(x => x.id === id);
-    if(item) {
-      item.qty = parseFloat(val) || 1;
-      render();
-    }
-  };
-
-  window.removeFromCart = (id) => {
-    cart = cart.filter(x => x.id !== id);
-    render();
-  };
-
-  window.togglePrintQueue = (id) => {
-    if(printQueue.includes(id)) printQueue = printQueue.filter(x => x !== id);
-    else printQueue.push(id);
-  };
-
-  window.preparePrint = () => {
-    if(printQueue.length === 0) return alert('กรุณาเลือกสินค้าอย่างน้อย 1 รายการ');
-    const area = document.getElementById('print-area');
-    area.innerHTML = printQueue.map(id => {
-      const p = products.find(x => x.id === id);
-      return `
-        <div class="price-tag">
-          <div class="tag-name">${p.name}</div>
-          <div class="tag-price">฿${(p.priceRG || 0).toLocaleString()}</div>
-          <svg class="barcode-svg" id="bc-${p.id}"></svg>
-        </div>
-      `;
-    }).join('');
-
-    // Generate Barcodes
-    printQueue.forEach(id => {
-      const p = products.find(x => x.id === id);
-      if(p.barcode) {
-        JsBarcode(`#bc-${p.id}`, p.barcode, {
-          format: "CODE128", width: 1, height: 30, displayValue: true, fontSize: 10
-        });
-      }
-    });
-
-    window.print();
-  };
-
-  // --- Initial Launch ---
-  window.addEventListener('click', (e) => {
-    const tabBtn = e.target.closest('[data-tab]');
-    if(tabBtn) {
-      currentTab = tabBtn.dataset.tab;
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      tabBtn.classList.add('active');
-      render();
-    }
-  });
-
-  render();
-})();
-</script>
+        priceR
