@@ -1,473 +1,917 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SAN POS ULTIMATE</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600&family=Noto+Sans+Lao:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Sarabun:wght@400;500;600&family=Noto+Sans+Lao:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
-        :root {
-            --primary: #1F5F4A;
-            --primary-dark: #143C30;
-            --gold: #E8A33D;
-            --surface: #FFFFFF;
-            --bg: #F2F4EE;
-            --ink: #1C2320;
-            --line: #DDE3D9;
-            --danger: #C1502E;
-        }
+#pos-root {
+  --paper: #F2F4EE;
+  --surface: #FFFFFF;
+  --ink: #1C2320;
+  --ink-soft: #5B655F;
+  --green: #1F5F4A;
+  --green-dark: #143C30;
+  --green-soft: #E4EEE8;
+  --gold: #E8A33D;
+  --gold-soft: #FBEBD1;
+  --brick: #C1502E;
+  --brick-soft: #F8E4DD;
+  --line: #DDE3D9;
+  font-family: 'Sarabun', 'Noto Sans Lao', sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  min-height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+#pos-root[data-lang="lo"] { font-family: 'Noto Sans Lao', 'Sarabun', sans-serif; }
+#pos-root * { box-sizing: border-box; }
+#pos-root h1, #pos-root h2, #pos-root h3, #pos-root .display {
+  font-family: 'Kanit', 'Noto Sans Lao', sans-serif;
+  letter-spacing: 0.01em;
+}
+#pos-root .mono { font-family: 'IBM Plex Mono', monospace; }
+#pos-root button { font-family: inherit; cursor: pointer; border: none; }
+#pos-root input, #pos-root select { font-family: inherit; }
 
-        body {
-            margin: 0;
-            font-family: 'Sarabun', 'Noto Sans Lao', sans-serif;
-            background: var(--bg);
-            color: var(--ink);
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
+.pos-header {
+  background: var(--green-dark);
+  color: #fff;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pos-header-top { display:flex; align-items:center; justify-content:space-between; width:100%; gap:12px; flex-wrap:wrap; }
+.pos-header h1 { font-size: 20px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px; }
+.pos-header h1 .tag { background: var(--gold); color: var(--green-dark); font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 4px; font-family:'Sarabun',sans-serif; }
+.lang-switch { display:flex; gap:4px; background: rgba(255,255,255,0.1); padding:3px; border-radius: 8px; }
+.lang-btn { padding: 5px 10px; border-radius:6px; font-size:12px; font-weight:700; color: rgba(255,255,255,0.7); background:transparent; }
+.lang-btn.active { background: #fff; color: var(--green-dark); }
 
-        /* Header & Tabs */
-        .header {
-            background: var(--primary-dark);
-            color: white;
-            padding: 10px 15px;
-            flex-shrink: 0;
-        }
-        .header-top { display: flex; justify-content: space-between; align-items: center; }
-        .tabs {
-            display: flex; gap: 5px; overflow-x: auto;
-            padding: 10px 0 5px; border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        .tab-btn {
-            background: rgba(255,255,255,0.1); color: white; border: none;
-            padding: 8px 15px; border-radius: 8px; white-space: nowrap; cursor: pointer;
-            font-size: 13px; font-weight: 500;
-        }
-        .tab-btn.active { background: var(--gold); color: var(--primary-dark); font-weight: 700; }
+.pos-tabs { display: flex; gap: 6px; background: rgba(255,255,255,0.08); padding: 4px; border-radius: 10px; overflow-x:auto; width:100%; }
+.pos-tab-btn { background: transparent; color: rgba(255,255,255,0.75); font-size: 13px; font-weight: 600; padding: 8px 14px; border-radius: 8px; white-space:nowrap; transition: background 0.15s, color 0.15s; }
+.pos-tab-btn.active { background: var(--gold); color: var(--green-dark); }
+.pos-tab-btn:not(.active):hover { background: rgba(255,255,255,0.12); color: #fff; }
 
-        /* Main Body Layout */
-        .main-container {
-            flex-grow: 1;
-            display: flex;
-            overflow: hidden;
-            height: 100%;
-        }
+.pos-body { padding: 18px 24px 28px; }
 
-        /* Sell Screen Layout */
-        .sell-grid {
-            display: grid;
-            grid-template-columns: 1fr 350px;
-            width: 100%;
-            height: 100%;
-        }
+/* ---- SELL TAB ---- */
+.mode-bar { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+.mode-toggle { display:flex; background: var(--surface); border:1.5px solid var(--line); border-radius: 10px; padding:3px; }
+.mode-btn { padding: 8px 16px; border-radius: 8px; font-size:13px; font-weight:700; color: var(--ink-soft); background:transparent; }
+.mode-btn.active.retail { background: var(--green); color:#fff; }
+.mode-btn.active.wholesale { background: var(--gold); color: var(--green-dark); }
+.customer-select { display:flex; gap:8px; align-items:center; flex:1; min-width:200px; }
+.customer-select select { flex:1; padding:9px 10px; border:1.5px solid var(--line); border-radius:9px; background:var(--surface); font-size:13.5px; color:var(--ink); }
+.member-badge { font-size:11px; font-weight:700; padding:4px 9px; border-radius:6px; background: var(--gold-soft); color:#8a5c14; white-space:nowrap; }
 
-        @media (max-width: 900px) {
-            .sell-grid { grid-template-columns: 1fr; grid-template-rows: 1fr 200px; }
-            .cart-panel { border-left: none !important; border-top: 2px solid var(--line); }
-        }
+.sell-grid { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+@media (max-width: 880px) { .sell-grid { grid-template-columns: 1fr; } }
 
-        .product-area {
-            padding: 15px;
-            overflow-y: auto;
-            background: var(--bg);
-        }
+.sell-toolbar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.sell-search { flex: 1; min-width: 160px; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px; font-size: 14px; background: var(--surface); color: var(--ink); }
+.sell-search:focus { outline: none; border-color: var(--green); }
 
-        .cart-panel {
-            background: white;
-            display: flex;
-            flex-direction: column;
-            border-left: 2px solid var(--line);
-        }
+.cat-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+.cat-chip { white-space: nowrap; padding: 7px 14px; border-radius: 999px; background: var(--surface); border: 1.5px solid var(--line); color: var(--ink-soft); font-size: 13px; font-weight: 600; }
+.cat-chip.active { background: var(--green); border-color: var(--green); color: #fff; }
 
-        /* Product Cards */
-        .product-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 12px;
-        }
-        .p-card {
-            background: white; border: 1px solid var(--line); border-radius: 12px;
-            overflow: hidden; transition: 0.2s; cursor: pointer;
-        }
-        .p-card:hover { transform: translateY(-3px); border-color: var(--primary); }
-        .p-img { width: 100%; height: 100px; object-fit: cover; background: #eee; }
-        .p-info { padding: 8px; }
-        .p-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; height: 1.4em; overflow: hidden; }
-        .p-price { color: var(--primary); font-weight: 700; font-size: 15px; }
+.product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.product-card { background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 12px; text-align: left; transition: border-color 0.15s, transform 0.1s; position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 108px; }
+.product-card:hover { border-color: var(--green); transform: translateY(-2px); }
+.product-card:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.product-card .pname { font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--ink); }
+.product-card .pcat { font-size: 11px; color: var(--ink-soft); }
+.product-card .pfoot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+.product-card .pprice { font-size: 15px; font-weight: 600; color: var(--green-dark); }
+.product-card .pstock { font-size: 10.5px; padding: 2px 6px; border-radius: 5px; background: var(--green-soft); color: var(--green-dark); font-weight: 600; }
+.product-card .pstock.low { background: var(--brick-soft); color: var(--brick); }
+.empty-note { color: var(--ink-soft); font-size: 14px; padding: 30px 10px; text-align: center; }
 
-        /* Cart Styling */
-        .cart-list { flex-grow: 1; overflow-y: auto; padding: 10px; }
-        .cart-item {
-            display: grid; grid-template-columns: 1fr 60px 30px;
-            gap: 10px; align-items: center; padding-bottom: 10px;
-            border-bottom: 1px solid #f0f0f0; margin-bottom: 10px;
-        }
-        .qty-input { width: 100%; padding: 5px; text-align: center; border-radius: 5px; border: 1px solid var(--line); font-weight: 700; }
-        
-        .cart-summary {
-            padding: 15px; background: #f9f9f9; border-top: 1px solid var(--line);
-        }
+.receipt-wrap { position: sticky; top: 10px; }
+.zigzag-top, .zigzag-bottom { height: 12px; background-image: linear-gradient(-45deg, var(--surface) 6px, transparent 0), linear-gradient(45deg, var(--surface) 6px, transparent 0); background-size: 14px 20px; background-repeat: repeat-x; }
+.zigzag-top { background-position: left top; }
+.zigzag-bottom { background-position: left bottom; }
+.receipt { background: var(--surface); padding: 4px 18px 16px; box-shadow: 0 2px 10px rgba(20,40,32,0.08); }
+.receipt-head { text-align: center; padding: 10px 0 12px; border-bottom: 1px dashed var(--line); }
+.receipt-head .display { font-size: 16px; font-weight: 700; color: var(--green-dark); }
+.receipt-head .sub { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+.cart-list { padding: 10px 0; max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.cart-empty { text-align: center; color: var(--ink-soft); font-size: 13px; padding: 24px 0; }
+.cart-row { display: flex; align-items: center; gap: 8px; }
+.cart-row .cname { flex: 1; font-size: 13px; font-weight: 500; line-height: 1.3; }
+.cart-row .cline { font-size: 11px; color: var(--ink-soft); }
+.qty-ctrl { display: flex; align-items: center; gap: 6px; }
+.qty-btn { width: 22px; height: 22px; border-radius: 6px; background: var(--green-soft); color: var(--green-dark); font-weight: 700; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center; }
+.qty-btn:hover { background: var(--green); color: #fff; }
+.qty-num { font-size: 13px; font-weight: 600; min-width: 16px; text-align: center; }
+.cart-line-total { width: 64px; text-align: right; font-size: 13px; font-weight: 600; }
+.cart-remove { background: transparent; color: var(--brick); font-size: 15px; padding: 2px 4px; }
 
-        /* Modal / QR Overlay */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-            display: flex; align-items: center; justify-content: center; z-index: 1000;
-        }
-        .modal-content {
-            background: white; padding: 25px; border-radius: 20px;
-            width: 90%; max-width: 400px; text-align: center;
-        }
-        .qr-display { width: 200px; height: 200px; margin: 10px auto; border: 5px solid #eee; }
-        .qr-display img { width: 100%; height: 100%; object-fit: contain; }
+.receipt-totals { border-top: 1px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.receipt-totals .row { display: flex; justify-content: space-between; }
+.receipt-totals .grand { font-size: 18px; font-weight: 700; color: var(--green-dark); border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 2px; }
+.cash-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.cash-row input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--line); border-radius: 8px; font-size: 14px; text-align: right; }
+.cash-row input:focus { outline: none; border-color: var(--green); }
+.checkout-btn { width: 100%; margin-top: 12px; padding: 13px; background: var(--green); color: #fff; font-weight: 700; font-size: 15px; border-radius: 10px; transition: background 0.15s; }
+.checkout-btn:hover:not(:disabled) { background: var(--green-dark); }
+.checkout-btn:disabled { background: var(--line); color: var(--ink-soft); cursor: not-allowed; }
+.clear-cart-btn { width: 100%; margin-top: 8px; padding: 8px; background: transparent; color: var(--ink-soft); font-size: 12px; font-weight: 600; text-decoration: underline; }
 
-        /* Stock Table */
-        .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; }
-        .data-table th, .data-table td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; }
+/* ---- PANELS (products/categories/members) ---- */
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+.panel + .panel { margin-top: 16px; }
+.panel h2 { font-size: 16px; font-weight: 700; margin: 0 0 12px; color: var(--green-dark); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; align-items: end; }
+.field label { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 4px; }
+.field input, .field select { width: 100%; padding: 9px 10px; border: 1.5px solid var(--line); border-radius: 8px; font-size: 13.5px; background: var(--paper); color: var(--ink); }
+.field input:focus, .field select:focus { outline: none; border-color: var(--green); }
+.form-submit { padding: 10px 18px; background: var(--green); color: #fff; font-weight: 700; font-size: 13.5px; border-radius: 8px; height: 40px; }
+.form-submit:hover { background: var(--green-dark); }
 
-        /* Print Style */
-        @media print {
-            body * { visibility: hidden; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; display: flex; flex-wrap: wrap; gap: 5px; }
-            .price-tag { 
-                width: 45mm; height: 28mm; border: 0.5px solid #000; 
-                display: flex; flex-direction: column; align-items: center; justify-content: center;
-                text-align: center; padding: 1mm;
-            }
-            .tag-bc { height: 10mm; width: 90%; }
-        }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 4px; }
+.data-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); padding: 8px 8px; border-bottom: 1.5px solid var(--line); }
+.data-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+.stock-badge { padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; background: var(--green-soft); color: var(--green-dark); }
+.stock-badge.low { background: var(--brick-soft); color: var(--brick); }
+.row-actions { display: flex; gap: 6px; }
+.icon-btn { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.icon-btn:hover { border-color: var(--green); color: var(--green-dark); }
+.icon-btn.danger:hover { border-color: var(--brick); color: var(--brick); }
+.chip-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+.cat-tag { display:flex; align-items:center; gap:8px; background: var(--paper); border:1.5px solid var(--line); border-radius:999px; padding:6px 8px 6px 14px; font-size:13px; font-weight:600; }
+.cat-tag button { background: var(--brick-soft); color: var(--brick); width:20px; height:20px; border-radius:50%; font-size:12px; line-height:1; display:flex; align-items:center; justify-content:center; }
 
-        .hidden { display: none !important; }
-    </style>
-</head>
-<body>
+/* ---- REPORTS ---- */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.stat-card { background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.stat-card .slabel { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+.stat-card .sval { font-size: 26px; font-weight: 700; color: var(--green-dark); margin-top: 4px; }
+.stat-card.gold .sval { color: var(--gold); }
+.stat-card.brick .sval { color: var(--brick); }
+.list-item { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.list-item:last-child { border-bottom: none; }
+.list-item .li-main { font-weight: 600; }
+.list-item .li-sub { font-size: 11.5px; color: var(--ink-soft); }
+.danger-zone { margin-top: 20px; text-align: right; }
+.danger-link { background: transparent; color: var(--brick); font-size: 12px; text-decoration: underline; font-weight: 600; }
 
-<div class="header">
-    <div class="header-top">
-        <h2 style="margin:0; font-family:'Kanit'; color:var(--gold);">SAN POS PRO</h2>
-        <div id="lang-switch">
-            <button class="tab-btn" onclick="setLang('th')">TH</button>
-            <button class="tab-btn" onclick="setLang('lo')">LO</button>
-            <button class="tab-btn" onclick="setLang('en')">EN</button>
-        </div>
-    </div>
-    <div class="tabs">
-        <button class="tab-btn active" id="btn-sell" onclick="setTab('sell')"><i class="fa fa-cart-shopping"></i> ขาย</button>
-        <button class="tab-btn" id="btn-stock" onclick="setTab('stock')"><i class="fa fa-boxes"></i> สต็อก/ป้าย</button>
-        <button class="tab-btn" id="btn-members" onclick="setTab('members')"><i class="fa fa-users"></i> สมาชิก</button>
-        <button class="tab-btn" id="btn-reports" onclick="setTab('reports')"><i class="fa fa-chart-line"></i> รายงาน/QR</button>
-    </div>
+/* ---- MODAL ---- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(20,30,25,0.55); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
+.modal-card { background: var(--surface); border-radius: 16px; max-width: 340px; width: 100%; padding: 24px; text-align: center; }
+.modal-card .check-circle { width: 52px; height: 52px; background: var(--green-soft); color: var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 12px; }
+.modal-card h3 { font-size: 17px; margin: 0 0 4px; }
+.modal-card .m-total { font-size: 22px; font-weight: 700; color: var(--green-dark); margin: 10px 0 2px; }
+.modal-card .m-change { font-size: 13px; color: var(--ink-soft); margin-bottom: 16px; }
+.modal-actions { display:flex; flex-direction:column; gap:8px; }
+.modal-close-btn { width: 100%; padding: 11px; background: var(--green); color: #fff; font-weight: 700; border-radius: 10px; font-size: 14px; }
+.modal-close-btn:hover { background: var(--green-dark); }
+.modal-print-btn { width: 100%; padding: 11px; background: var(--gold-soft); color: #8a5c14; font-weight: 700; border-radius: 10px; font-size: 14px; }
+.modal-print-btn:hover { background: var(--gold); color:#fff; }
+
+.loading-screen { padding: 80px 20px; text-align: center; color: var(--ink-soft); font-size: 14px; }
+
+/* ---- Print receipt (hidden on screen) ---- */
+#print-receipt { display: none; }
+@media print {
+  body > *:not(#print-receipt-portal) { display: none !important; }
+  #print-receipt-portal { display: block !important; position: static; }
+  #print-receipt { display: block !important; width: 78mm; margin: 0 auto; font-family: 'IBM Plex Mono', monospace; color: #000; }
+  #print-receipt .pr-shop { text-align:center; font-weight:700; font-size:14px; margin-bottom:4px; }
+  #print-receipt .pr-sub { text-align:center; font-size:10px; margin-bottom:8px; }
+  #print-receipt hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+  #print-receipt .pr-row { display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px; }
+  #print-receipt .pr-total { font-weight:700; font-size:13px; }
+}
+</style>
+
+<div id="pos-root" data-lang="th">
+  <div id="pos-mount" class="loading-screen">กำลังโหลดข้อมูลร้านค้า…</div>
 </div>
-
-<div class="main-container" id="main-view"></div>
-
-<!-- พื้นที่พิมพ์ -->
-<div id="print-area"></div>
+<div id="print-receipt-portal"><div id="print-receipt"></div></div>
 
 <script>
-    // --- Data Storage ---
-    let products = JSON.parse(localStorage.getItem('pos-products-v2') || '[]');
-    let members = JSON.parse(localStorage.getItem('pos-members-v2') || '[]');
-    let sales = JSON.parse(localStorage.getItem('pos-sales-v2') || '[]');
-    let categories = JSON.parse(localStorage.getItem('pos-categories-v2') || ['ทั่วไป']);
-    let shopQr = localStorage.getItem('pos-shop-qr') || '';
-    
-    let currentTab = 'sell';
-    let currentLang = 'th';
-    let cart = [];
-    let selectedMemberId = '';
-    let searchQuery = '';
-    let tagQueue = [];
+(function(){
+  const mount = document.getElementById('pos-mount');
+  const root = document.getElementById('pos-root');
 
-    const i18n = {
-        th: { total: 'ยอดรวม', pay: 'ชำระเงิน', change: 'เงินทอน', stock: 'คงเหลือ', search: 'ค้นหา/บาร์โค้ด...', checkout: 'สำเร็จ', transfer: 'โอนเงิน', uploadQr: 'อัปโหลด QR ร้าน' },
-        lo: { total: 'ລວມທັງໝົດ', pay: 'ຊຳລະເງິນ', change: 'ເງິນທອນ', stock: 'ຄົງເຫຼືອ', search: 'ຄົ້ນຫາ...', checkout: 'ສຳເລັດ', transfer: 'ໂອນເງິນ', uploadQr: 'ອັບໂຫລດ QR' },
-        en: { total: 'Total', pay: 'Pay', change: 'Change', stock: 'Stock', search: 'Search...', checkout: 'Checkout', transfer: 'Transfer', uploadQr: 'Upload QR' }
-    };
+  // ---------- i18n ----------
+  const LANGS = ['th','lo','en'];
+  const DICT = {
+    appName: {th:'ร้านค้าของสัน', lo:'ຮ້ານຄ້າຂອງສັນ', en:"San's Store"},
+    tabSell: {th:'ขายสินค้า', lo:'ຂາຍສິນຄ້າ', en:'Sell'},
+    tabProducts: {th:'สินค้า', lo:'ສິນຄ້າ', en:'Products'},
+    tabCategories: {th:'หมวดหมู่', lo:'ໝວດໝູ່', en:'Categories'},
+    tabMembers: {th:'สมาชิก', lo:'ສະມາຊິກ', en:'Members'},
+    tabReports: {th:'รายงาน', lo:'ລາຍງານ', en:'Reports'},
+    retail: {th:'ขายปลีก', lo:'ຂາຍຍ່ອຍ', en:'Retail'},
+    wholesale: {th:'ขายส่ง', lo:'ຂາຍສົ່ງ', en:'Wholesale'},
+    walkIn: {th:'ลูกค้าทั่วไป', lo:'ລູກຄ້າທົ່ວໄປ', en:'Walk-in customer'},
+    memberBadge: {th:'ราคาสมาชิก', lo:'ລາຄາສະມາຊິກ', en:'Member price'},
+    search: {th:'ค้นหาสินค้า…', lo:'ຄົ້ນຫາສິນຄ້າ…', en:'Search products…'},
+    all: {th:'ทั้งหมด', lo:'ທັງໝົດ', en:'All'},
+    stockLeft: {th:'คงเหลือ', lo:'ຄົງເຫຼືອ', en:'left'},
+    receiptTitle: {th:'ใบเสร็จ', lo:'ໃບບິນ', en:'Receipt'},
+    emptyCart: {th:'แตะสินค้าเพื่อเพิ่มลงตะกร้า', lo:'ແຕະສິນຄ້າເພື່ອເພີ່ມໃສ່ກະຕ່າ', en:'Tap a product to add to cart'},
+    items: {th:'รายการ', lo:'ລາຍການ', en:'Items'},
+    pieces: {th:'ชิ้น', lo:'ອັນ', en:'pcs'},
+    grandTotal: {th:'รวมทั้งสิ้น', lo:'ລວມທັງໝົດ', en:'Total'},
+    cashReceived: {th:'รับเงิน ฿', lo:'ຮັບເງິນ ₭', en:'Cash $'},
+    change: {th:'เงินทอน', lo:'ເງິນທອນ', en:'Change'},
+    checkout: {th:'ชำระเงิน', lo:'ຊຳລະເງິນ', en:'Checkout'},
+    clearCart: {th:'ล้างตะกร้า', lo:'ລ້າງກະຕ່າ', en:'Clear cart'},
+    checkoutSuccess: {th:'ชำระเงินสำเร็จ', lo:'ຊຳລະເງິນສຳເລັດ', en:'Payment successful'},
+    printReceipt: {th:'พิมพ์ใบเสร็จ', lo:'ພິມໃບບິນ', en:'Print receipt'},
+    newSale: {th:'ทำรายการใหม่', lo:'ເຮັດລາຍການໃໝ່', en:'New sale'},
+    addProduct: {th:'เพิ่มสินค้าใหม่', lo:'ເພີ່ມສິນຄ້າໃໝ່', en:'Add new product'},
+    editProduct: {th:'แก้ไขสินค้า', lo:'ແກ້ໄຂສິນຄ້າ', en:'Edit product'},
+    productName: {th:'ชื่อสินค้า', lo:'ຊື່ສິນຄ້າ', en:'Product name'},
+    category: {th:'หมวดหมู่', lo:'ໝວດໝູ່', en:'Category'},
+    priceRetailGeneral: {th:'ราคาปลีก (ทั่วไป)', lo:'ລາຄາຍ່ອຍ (ທົ່ວໄປ)', en:'Retail price (general)'},
+    priceRetailMember: {th:'ราคาปลีก (สมาชิก)', lo:'ລາຄາຍ່ອຍ (ສະມາຊິກ)', en:'Retail price (member)'},
+    priceWholesaleGeneral: {th:'ราคาส่ง (ทั่วไป)', lo:'ລາຄາສົ່ງ (ທົ່ວໄປ)', en:'Wholesale price (general)'},
+    priceWholesaleMember: {th:'ราคาส่ง (สมาชิก)', lo:'ລາຄາສົ່ງ (ສະມາຊິກ)', en:'Wholesale price (member)'},
+    stock: {th:'จำนวนคงเหลือ', lo:'ຈຳນວນຄົງເຫຼືອ', en:'Stock qty'},
+    unit: {th:'หน่วย', lo:'ໜ່ວຍ', en:'Unit'},
+    save: {th:'บันทึกการแก้ไข', lo:'ບັນທຶກການແກ້ໄຂ', en:'Save changes'},
+    add: {th:'เพิ่มสินค้า', lo:'ເພີ່ມສິນຄ້າ', en:'Add product'},
+    cancel: {th:'ยกเลิก', lo:'ຍົກເລີກ', en:'Cancel'},
+    edit: {th:'แก้ไข', lo:'ແກ້ໄຂ', en:'Edit'},
+    del: {th:'ลบ', lo:'ລຶບ', en:'Delete'},
+    productListTitle: {th:'รายการสินค้าทั้งหมด', lo:'ລາຍການສິນຄ້າທັງໝົດ', en:'All products'},
+    noProducts: {th:'ยังไม่มีสินค้า', lo:'ຍັງບໍ່ມີສິນຄ້າ', en:'No products yet'},
+    addCategory: {th:'เพิ่มหมวดหมู่ใหม่', lo:'ເພີ່ມໝວດໝູ່ໃໝ່', en:'Add new category'},
+    categoryName: {th:'ชื่อหมวดหมู่', lo:'ຊື່ໝວດໝູ່', en:'Category name'},
+    categoryListTitle: {th:'หมวดหมู่ทั้งหมด', lo:'ໝວດໝູ່ທັງໝົດ', en:'All categories'},
+    addMember: {th:'เพิ่มสมาชิกใหม่', lo:'ເພີ່ມສະມາຊິກໃໝ່', en:'Add new member'},
+    memberName: {th:'ชื่อสมาชิก', lo:'ຊື່ສະມາຊິກ', en:'Member name'},
+    memberPhone: {th:'เบอร์โทร', lo:'ເບີໂທ', en:'Phone'},
+    memberListTitle: {th:'รายชื่อสมาชิกทั้งหมด', lo:'ລາຍຊື່ສະມາຊິກທັງໝົດ', en:'All members'},
+    noMembers: {th:'ยังไม่มีสมาชิก', lo:'ຍັງບໍ່ມີສະມາຊິກ', en:'No members yet'},
+    selectMember: {th:'— เลือกสมาชิก —', lo:'— ເລືອກສະມາຊິກ —', en:'— Select member —'},
+    todaySales: {th:'ยอดขายวันนี้', lo:'ຍອດຂາຍມື້ນີ້', en:"Today's sales"},
+    todayBills: {th:'จำนวนบิลวันนี้', lo:'ຈຳນວນບິນມື້ນີ້', en:"Today's bills"},
+    lowStockCount: {th:'สินค้าใกล้หมด', lo:'ສິນຄ້າໃກ້ໝົດ', en:'Low stock items'},
+    topProducts: {th:'สินค้าขายดี (สะสม)', lo:'ສິນຄ້າຂາຍດີ (ສະສົມ)', en:'Best sellers (all-time)'},
+    lowStockList: {th:'สินค้าใกล้หมด (≤10 ชิ้น)', lo:'ສິນຄ້າໃກ້ໝົດ (≤10 ອັນ)', en:'Low stock (≤10 units)'},
+    okStock: {th:'สต็อกสินค้าปกติดี', lo:'ສະຕັອກສິນຄ້າປົກກະຕິດີ', en:'Stock levels are healthy'},
+    recentSales: {th:'รายการขายล่าสุด', lo:'ລາຍການຂາຍລ່າສຸດ', en:'Recent sales'},
+    noSalesData: {th:'ยังไม่มีข้อมูลการขาย', lo:'ຍັງບໍ່ມີຂໍ້ມູນການຂາຍ', en:'No sales data yet'},
+    noSales: {th:'ยังไม่มีรายการขาย', lo:'ຍັງບໍ່ມີລາຍການຂາຍ', en:'No sales yet'},
+    resetAll: {th:'ล้างข้อมูลทั้งหมด (เริ่มใหม่)', lo:'ລ້າງຂໍ້ມູນທັງໝົດ (ເລີ່ມໃໝ່)', en:'Reset all data'},
+    confirmDeleteProduct: {th:'ใช่หรือไม่?', lo:'ແມ່ນບໍ?', en:'Are you sure?'},
+    confirmReset: {th:'ล้างข้อมูลสินค้า หมวดหมู่ สมาชิก และประวัติการขายทั้งหมด และเริ่มต้นใหม่ ใช่หรือไม่?', lo:'ລ້າງຂໍ້ມູນສິນຄ້າ, ໝວດໝູ່, ສະມາຊິກ ແລະ ປະຫວັດການຂາຍທັງໝົດ ແລະ ເລີ່ມຕົ້ນໃໝ່ ແມ່ນບໍ?', en:'Clear all products, categories, members and sales history and start fresh?'},
+    saleModeLabel: {th:'โหมดขาย', lo:'ໂໝດຂາຍ', en:'Sale mode'},
+    thankYou: {th:'ขอบคุณที่ใช้บริการ', lo:'ຂອບໃຈທີ່ໃຊ້ບໍລິການ', en:'Thank you for your purchase'},
+    currency: {th:'฿', lo:'₭', en:'$'},
+  };
+  let lang = 'th';
+  function t(key){ return (DICT[key] && DICT[key][lang]) || key; }
 
-    function t(key) { return i18n[currentLang][key] || key; }
+  // ---------- state ----------
+  let products = [];
+  let categories = [];
+  let members = [];
+  let sales = [];
+  let cart = [];
+  let tab = 'sell';
+  let activeCategory = null; // set to t('all') dynamically
+  let searchQuery = '';
+  let cashInput = '';
+  let saleMode = 'retail'; // retail | wholesale
+  let selectedMemberId = '';
+  let receiptModal = null;
+  let productFormEdit = null;
+  let memberFormEdit = null;
 
-    function save() {
-        localStorage.setItem('pos-products-v2', JSON.stringify(products));
-        localStorage.setItem('pos-members-v2', JSON.stringify(members));
-        localStorage.setItem('pos-sales-v2', JSON.stringify(sales));
-        localStorage.setItem('pos-shop-qr', shopQr);
+  function uid(p){ return p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  function seedCategories(){
+    return ['เครื่องปรุง','ของใช้ในบ้าน','อาหารแห้ง','อาหารสด','ช็อกโกแลตและขนม','เครื่องดื่ม','เครื่องสำอาง','น้ำยาถูบ้านและผงซักฟอก','ของใช้เด็กและคนแก่','น้ำมัน','หัวอาหาร (อาหารสัตว์)','เครื่องมือช่าง','อื่นๆ'];
+  }
+  function seedProducts(){
+    const p = (name,cat,unit,rg,rm,wg,wm,stock)=>({id:uid('p'),name,category:cat,unit,priceRetailGeneral:rg,priceRetailMember:rm,priceWholesaleGeneral:wg,priceWholesaleMember:wm,stock});
+    return [
+      p('น้ำปลาตราปลาหมึก 700 มล.','เครื่องปรุง','ขวด',35,32,30,28,40),
+      p('ซีอิ๊วขาว','เครื่องปรุง','ขวด',25,23,21,20,30),
+      p('ข้าวสารหอมมะลิ 5 กก.','อาหารแห้ง','ถุง',220,210,200,195,25),
+      p('บะหมี่กึ่งสำเร็จรูป','อาหารแห้ง','ซอง',6,5.5,5,4.5,200),
+      p('ไข่ไก่เบอร์ 2 (แผง 30 ฟอง)','อาหารสด','แผง',130,125,120,115,20),
+      p('น้ำอัดลม กระป๋อง','เครื่องดื่ม','กระป๋อง',15,14,12,11,100),
+      p('นมกล่อง UHT','เครื่องดื่ม','กล่อง',14,13,11,10,60),
+      p('ขนมขบเคี้ยว','ช็อกโกแลตและขนม','ซอง',10,9,8,7.5,80),
+      p('สบู่ก้อน','ของใช้ในบ้าน','ก้อน',15,14,12,11,50),
+      p('ผงซักฟอก 1 กก.','น้ำยาถูบ้านและผงซักฟอก','ถุง',65,60,55,52,20),
+      p('แชมพูสระผม','เครื่องสำอาง','ขวด',45,42,38,36,25),
+      p('ผ้าอ้อมเด็ก (แพ็ค)','ของใช้เด็กและคนแก่','แพ็ค',180,170,160,155,15),
+      p('น้ำมันพืช 1 ลิตร','น้ำมัน','ขวด',55,52,48,46,30),
+      p('หัวอาหารไก่ 30 กก.','หัวอาหาร (อาหารสัตว์)','กระสอบ',480,460,440,420,10),
+      p('ไขควงชุด','เครื่องมือช่าง','ชุด',120,110,100,95,8),
+    ];
+  }
+
+  // Storage layer: uses the Claude artifact storage API when available (viewing inside
+  // a chat), and falls back to the browser's own localStorage when the file is opened
+  // directly (downloaded and double-clicked, or hosted on the shop's own device).
+  // This is what makes data actually persist when opening/closing the file standalone.
+  const hasCloudStorage = (typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function');
+  async function kvGet(key){
+    if (hasCloudStorage){
+      try { const r = await window.storage.get(key, false); return r && r.value ? r.value : null; }
+      catch(e){ return null; }
     }
-
-    function setTab(tab) {
-        currentTab = tab;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('btn-' + tab).classList.add('active');
-        render();
+    try { return window.localStorage.getItem(key); } catch(e){ return null; }
+  }
+  async function kvSet(key, value){
+    if (hasCloudStorage){
+      try { await window.storage.set(key, value, false); return true; }
+      catch(e){ console.error(e); return false; }
     }
+    try { window.localStorage.setItem(key, value); return true; }
+    catch(e){ console.error(e); return false; }
+  }
 
-    function setLang(l) { currentLang = l; render(); }
+  async function loadData(){
+    try { const v = await kvGet('pos-categories-v2'); categories = v ? JSON.parse(v) : null; } catch(e){ categories = null; }
+    if (!categories){ categories = seedCategories(); await saveCategories(); }
 
-    function getPrice(p) {
-        const isMem = !!selectedMemberId;
-        return isMem ? (p.priceRetailMember || 0) : (p.priceRetailGeneral || 0);
+    try { const v = await kvGet('pos-products-v2'); products = v ? JSON.parse(v) : null; } catch(e){ products = null; }
+    if (!products){ products = seedProducts(); await saveProducts(); }
+
+    try { const v = await kvGet('pos-members-v2'); members = v ? JSON.parse(v) : []; } catch(e){ members = []; }
+    try { const v = await kvGet('pos-sales-v2'); sales = v ? JSON.parse(v) : []; } catch(e){ sales = []; }
+    try { const v = await kvGet('pos-settings-v2'); if (v){ const s=JSON.parse(v); if (LANGS.includes(s.lang)) lang = s.lang; } } catch(e){}
+  }
+  async function saveProducts(){ await kvSet('pos-products-v2', JSON.stringify(products)); }
+  async function saveCategories(){ await kvSet('pos-categories-v2', JSON.stringify(categories)); }
+  async function saveMembers(){ await kvSet('pos-members-v2', JSON.stringify(members)); }
+  async function saveSales(){ await kvSet('pos-sales-v2', JSON.stringify(sales)); }
+  async function saveSettings(){ await kvSet('pos-settings-v2', JSON.stringify({lang})); }
+
+  function money(n){ return (Math.round(n*100)/100).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  function todayStr(){ const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function fmtTime(ts){ const d = new Date(ts); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'}); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function priceFor(p){
+    const member = !!selectedMemberId;
+    if (saleMode === 'retail') return member ? p.priceRetailMember : p.priceRetailGeneral;
+    return member ? p.priceWholesaleMember : p.priceWholesaleGeneral;
+  }
+  function cartTotal(){ return cart.reduce((s,i)=>s+i.price*i.qty,0); }
+
+  // ---------- render ----------
+  function render(){
+    root.setAttribute('data-lang', lang);
+    if (activeCategory === null) activeCategory = t('all');
+
+    mount.innerHTML = `
+      <div class="pos-header">
+        <div class="pos-header-top">
+          <h1>${esc(t('appName'))} <span class="tag">POS</span></h1>
+          <div class="lang-switch">
+            <button class="lang-btn ${lang==='th'?'active':''}" data-lang-btn="th">ไทย</button>
+            <button class="lang-btn ${lang==='lo'?'active':''}" data-lang-btn="lo">ລາວ</button>
+            <button class="lang-btn ${lang==='en'?'active':''}" data-lang-btn="en">EN</button>
+          </div>
+        </div>
+        <div class="pos-tabs">
+          <button class="pos-tab-btn ${tab==='sell'?'active':''}" data-tab="sell">${esc(t('tabSell'))}</button>
+          <button class="pos-tab-btn ${tab==='products'?'active':''}" data-tab="products">${esc(t('tabProducts'))}</button>
+          <button class="pos-tab-btn ${tab==='categories'?'active':''}" data-tab="categories">${esc(t('tabCategories'))}</button>
+          <button class="pos-tab-btn ${tab==='members'?'active':''}" data-tab="members">${esc(t('tabMembers'))}</button>
+          <button class="pos-tab-btn ${tab==='reports'?'active':''}" data-tab="reports">${esc(t('tabReports'))}</button>
+        </div>
+      </div>
+      <div class="pos-body" id="pos-body"></div>
+    `;
+    const body = document.getElementById('pos-body');
+    if (tab === 'sell') body.innerHTML = renderSell();
+    else if (tab === 'products') body.innerHTML = renderProducts();
+    else if (tab === 'categories') body.innerHTML = renderCategories();
+    else if (tab === 'members') body.innerHTML = renderMembers();
+    else body.innerHTML = renderReports();
+
+    if (receiptModal) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = renderReceiptModal();
+      mount.appendChild(wrap.firstElementChild);
     }
+    attachEvents();
+  }
 
-    // --- Core UI Renderers ---
-
-    function render() {
-        const view = document.getElementById('main-view');
-        if (currentTab === 'sell') renderSell(view);
-        else if (currentTab === 'stock') renderStock(view);
-        else if (currentTab === 'members') renderMembers(view);
-        else if (currentTab === 'reports') renderReports(view);
+  function renderSell(){
+    const cur = t('currency');
+    const cats = [t('all'), ...categories];
+    let filtered = products.filter(p => (activeCategory===t('all') || p.category===activeCategory));
+    if (searchQuery.trim()){
+      const q = searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
     }
+    const cards = filtered.length ? filtered.map(p=>{
+      const inCart = cart.find(c=>c.id===p.id);
+      const remaining = p.stock - (inCart ? inCart.qty : 0);
+      const low = p.stock <= 10;
+      const price = priceFor(p);
+      return `
+        <button class="product-card" data-add="${p.id}" ${remaining<=0?'disabled':''}>
+          <div class="pname">${esc(p.name)}</div>
+          <div class="pcat">${esc(p.category)}</div>
+          <div class="pfoot">
+            <span class="pprice mono">${cur}${money(price)}</span>
+            <span class="pstock ${low?'low':''}">${esc(t('stockLeft'))} ${remaining}</span>
+          </div>
+        </button>`;
+    }).join('') : `<div class="empty-note">${esc(t('noProducts'))}</div>`;
 
-    function renderSell(el) {
-        let filtered = products.filter(p => p.name.includes(searchQuery) || (p.barcode && p.barcode === searchQuery));
-        
-        el.innerHTML = `
-            <div class="sell-grid">
-                <div class="product-area">
-                    <div style="display:flex; gap:10px; margin-bottom:15px;">
-                        <input type="text" id="sell-search" placeholder="${t('search')}" value="${searchQuery}" style="flex:1; padding:12px; border-radius:10px; border:1px solid var(--line);">
-                        <select id="sel-member" onchange="setMember(this.value)" style="padding:10px; border-radius:10px;">
-                            <option value="">-- ${t('search')} --</option>
-                            ${members.map(m => `<option value="${m.id}" ${selectedMemberId===m.id?'selected':''}>${m.name}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="product-grid">
-                        ${filtered.map(p => `
-                            <div class="p-card" onclick="addToCart('${p.id}')">
-                                <img src="${p.img || 'https://via.placeholder.com/150?text=No+Image'}" class="p-img">
-                                <div class="p-info">
-                                    <div class="p-name">${p.name}</div>
-                                    <div class="p-price">฿${getPrice(p).toLocaleString()}</div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="cart-panel">
-                    <div style="padding:15px; font-weight:bold; border-bottom:1px solid var(--line);">ตะกร้าสินค้า</div>
-                    <div class="cart-list">
-                        ${cart.map(item => `
-                            <div class="cart-item">
-                                <div><div style="font-size:14px;">${item.name}</div><div style="font-size:12px; color:var(--primary);">฿${item.price}</div></div>
-                                <input type="number" class="qty-input" value="${item.qty}" onchange="updateQty('${item.id}', this.value)">
-                                <button onclick="rmCart('${item.id}')" style="border:none; background:none; color:red;">✕</button>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="cart-summary">
-                        <div style="display:flex; justify-content:space-between; font-size:20px; font-weight:bold; margin-bottom:15px;">
-                            <span>${t('total')}</span>
-                            <span style="color:var(--primary);">฿${cart.reduce((s,i)=>s+(i.price*i.qty),0).toLocaleString()}</span>
-                        </div>
-                        <button onclick="showPayModal()" style="width:100%; padding:15px; border-radius:10px; border:none; background:var(--primary); color:white; font-weight:bold; font-size:18px;">${t('pay')}</button>
-                    </div>
-                </div>
+    const cartRows = cart.length ? cart.map(c=>`
+      <div class="cart-row" data-cart-id="${c.id}">
+        <div style="flex:1">
+          <div class="cname">${esc(c.name)}</div>
+          <div class="cline mono">${cur}${money(c.price)} x ${c.qty}</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" data-qty="-1">−</button>
+          <span class="qty-num">${c.qty}</span>
+          <button class="qty-btn" data-qty="1">+</button>
+        </div>
+        <div class="cart-line-total mono">${cur}${money(c.price*c.qty)}</div>
+        <button class="cart-remove" data-remove="1">✕</button>
+      </div>
+    `).join('') : `<div class="cart-empty">${esc(t('emptyCart'))}</div>`;
+
+    const total = cartTotal();
+    const cash = parseFloat(cashInput);
+    const validCash = !isNaN(cash) && cash >= total && total > 0;
+    const change = validCash ? cash - total : 0;
+    const memberOptions = members.map(m=>`<option value="${m.id}" ${selectedMemberId===m.id?'selected':''}>${esc(m.name)}${m.phone?(' · '+esc(m.phone)):''}</option>`).join('');
+
+    return `
+      <div class="mode-bar">
+        <div class="mode-toggle">
+          <button class="mode-btn retail ${saleMode==='retail'?'active':''}" data-mode="retail">${esc(t('retail'))}</button>
+          <button class="mode-btn wholesale ${saleMode==='wholesale'?'active':''}" data-mode="wholesale">${esc(t('wholesale'))}</button>
+        </div>
+        <div class="customer-select">
+          <select id="member-select">
+            <option value="">${esc(t('walkIn'))}</option>
+            ${memberOptions}
+          </select>
+          ${selectedMemberId ? `<span class="member-badge">${esc(t('memberBadge'))}</span>` : ''}
+        </div>
+      </div>
+      <div class="sell-grid">
+        <div>
+          <div class="sell-toolbar">
+            <input type="text" class="sell-search" id="search-input" placeholder="${esc(t('search'))}" value="${esc(searchQuery)}" />
+          </div>
+          <div class="cat-scroll">
+            ${cats.map(c=>`<button class="cat-chip ${c===activeCategory?'active':''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('')}
+          </div>
+          <div class="product-grid">${cards}</div>
+        </div>
+        <div class="receipt-wrap">
+          <div class="zigzag-top"></div>
+          <div class="receipt">
+            <div class="receipt-head">
+              <div class="display">${esc(t('receiptTitle'))}</div>
+              <div class="sub">${esc(t(saleMode))} · ${selectedMemberId ? esc(t('memberBadge')) : esc(t('walkIn'))}</div>
             </div>
-        `;
-        const input = document.getElementById('sell-search');
-        input.focus();
-        input.oninput = (e) => { searchQuery = e.target.value; render(); input.focus(); };
-    }
-
-    function renderStock(el) {
-        el.innerHTML = `
-            <div style="padding:20px; overflow-y:auto; width:100%;">
-                <div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px;">
-                    <h3>เพิ่ม/แก้ไขสินค้า</h3>
-                    <form id="prod-form" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px;">
-                        <input type="text" name="name" placeholder="ชื่อสินค้า *" required style="padding:8px;">
-                        <input type="text" name="barcode" placeholder="บาร์โค้ด">
-                        <input type="text" name="img" placeholder="URL รูปภาพ (Google)">
-                        <input type="number" name="prG" placeholder="ราคาปลีกทั่วไป">
-                        <input type="number" name="prM" placeholder="ราคาปลีกสมาชิก">
-                        <input type="number" name="stock" placeholder="สต็อก">
-                        <button type="submit" style="background:var(--primary); color:white; border:none; border-radius:5px;">บันทึก</button>
-                    </form>
-                </div>
-                <button onclick="printBatchTags()" style="margin-bottom:10px; padding:10px; background:var(--gold); border:none; border-radius:5px;">พิมพ์ป้ายที่เลือก (${tagQueue.length})</button>
-                <table class="data-table">
-                    <thead><tr><th>เลือก</th><th>สินค้า</th><th>บาร์โค้ด</th><th>ราคา</th><th>สต็อก</th><th>จัดการ</th></tr></thead>
-                    <tbody>
-                        ${products.map(p => `
-                            <tr>
-                                <td><input type="checkbox" onchange="toggleTagQueue('${p.id}')" ${tagQueue.includes(p.id)?'checked':''}></td>
-                                <td>${p.name}</td>
-                                <td>${p.barcode || '-'}</td>
-                                <td>${p.priceRetailGeneral || 0}</td>
-                                <td>${p.stock || 0}</td>
-                                <td><button onclick="delProduct('${p.id}')" style="color:red; background:none; border:none;">ลบ</button></td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
+            <div class="cart-list">${cartRows}</div>
+            <div class="receipt-totals">
+              <div class="row"><span>${esc(t('items'))}</span><span class="mono">${cart.reduce((s,i)=>s+i.qty,0)} ${esc(t('pieces'))}</span></div>
+              <div class="row grand"><span>${esc(t('grandTotal'))}</span><span class="mono">${cur}${money(total)}</span></div>
+              <div class="cash-row">
+                <label style="font-size:12px;color:var(--ink-soft);white-space:nowrap;">${esc(t('cashReceived'))}</label>
+                <input type="number" id="cash-input" inputmode="decimal" placeholder="0.00" value="${esc(cashInput)}" />
+              </div>
+              <div class="row" style="font-size:12px;color:var(--ink-soft);">
+                <span>${esc(t('change'))}</span><span class="mono">${validCash ? cur+money(change) : '—'}</span>
+              </div>
             </div>
-        `;
-        document.getElementById('prod-form').onsubmit = (e) => {
-            e.preventDefault();
-            const fd = new FormData(e.target);
-            products.push({
-                id: 'p-' + Date.now(),
-                name: fd.get('name'),
-                barcode: fd.get('barcode'),
-                img: fd.get('img'),
-                priceRetailGeneral: parseFloat(fd.get('prG')) || 0,
-                priceRetailMember: parseFloat(fd.get('prM')) || 0,
-                stock: parseFloat(fd.get('stock')) || 0
-            });
-            save(); render();
-        };
-    }
+            <button class="checkout-btn" id="checkout-btn" ${(!validCash || cart.length===0)?'disabled':''}>${esc(t('checkout'))}</button>
+            ${cart.length ? `<button class="clear-cart-btn" id="clear-cart-btn">${esc(t('clearCart'))}</button>` : ''}
+          </div>
+          <div class="zigzag-bottom"></div>
+        </div>
+      </div>
+    `;
+  }
 
-    function renderReports(el) {
-        el.innerHTML = `
-            <div style="padding:20px; width:100%;">
-                <div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px; border:2px solid var(--gold);">
-                    <h3><i class="fa fa-qrcode"></i> ตั้งค่า QR Code ร้านค้า (โอนเงิน)</h3>
-                    <p style="font-size:12px; color:var(--ink-soft);">อัปโหลด QR Code ของคุณที่นี่ รูปจะถูกบันทึกไว้ใช้ถาวร</p>
-                    <input type="file" accept="image/*" onchange="handleQrUpload(this)" style="margin-bottom:10px;">
-                    <div style="width:150px; height:150px; background:#f0f0f0; border:2px dashed #ccc;">
-                        ${shopQr ? `<img src="${shopQr}" style="width:100%; height:100%; object-fit:contain;">` : '<div style="padding:40px 10px; font-size:10px;">ยังไม่มี QR</div>'}
-                    </div>
-                </div>
-                <h3>รายการขายล่าสุด</h3>
-                <div style="background:white; border-radius:15px; overflow:hidden;">
-                    <table class="data-table">
-                        ${sales.slice().reverse().slice(0, 10).map(s => `
-                            <tr><td>${new Date(s.ts).toLocaleString()}</td><td>฿${s.total.toLocaleString()}</td></tr>
-                        `).join('')}
-                    </table>
-                </div>
+  function renderReceiptModal(){
+    const m = receiptModal; const cur = t('currency');
+    return `
+      <div class="modal-overlay" id="receipt-overlay">
+        <div class="modal-card">
+          <div class="check-circle">✓</div>
+          <h3>${esc(t('checkoutSuccess'))}</h3>
+          <div style="font-size:12px;color:var(--ink-soft);">${m.items.reduce((s,i)=>s+i.qty,0)} ${esc(t('pieces'))} • ${fmtTime(m.ts)}</div>
+          <div class="m-total mono">${cur}${money(m.total)}</div>
+          <div class="m-change">${esc(t('cashReceived'))}${money(m.cash)} · ${esc(t('change'))} ${cur}${money(m.change)}</div>
+          <div class="modal-actions">
+            <button class="modal-print-btn" id="print-receipt-btn">${esc(t('printReceipt'))}</button>
+            <button class="modal-close-btn" id="close-receipt-btn">${esc(t('newSale'))}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderProducts(){
+    const cur = t('currency');
+    const editing = productFormEdit ? products.find(p=>p.id===productFormEdit) : null;
+    const catOptions = categories.map(c=>`<option value="${esc(c)}" ${editing&&editing.category===c?'selected':''}>${esc(c)}</option>`).join('');
+    const rows = products.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+      const low = p.stock<=10;
+      return `
+        <tr>
+          <td>${esc(p.name)}</td>
+          <td>${esc(p.category)}</td>
+          <td class="mono">${cur}${money(p.priceRetailGeneral)} / ${cur}${money(p.priceWholesaleGeneral)}</td>
+          <td><span class="stock-badge ${low?'low':''}">${p.stock} ${esc(p.unit||'')}</span></td>
+          <td><div class="row-actions">
+            <button class="icon-btn" data-edit="${p.id}">${esc(t('edit'))}</button>
+            <button class="icon-btn danger" data-delete="${p.id}">${esc(t('del'))}</button>
+          </div></td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div class="panel">
+        <h2>${editing ? esc(t('editProduct')) : esc(t('addProduct'))}</h2>
+        <form id="product-form">
+          <div class="form-grid">
+            <div class="field"><label>${esc(t('productName'))}</label><input type="text" name="name" required value="${editing?esc(editing.name):''}" /></div>
+            <div class="field"><label>${esc(t('category'))}</label><select name="category" required>${catOptions}</select></div>
+            <div class="field"><label>${esc(t('unit'))}</label><input type="text" name="unit" value="${editing?esc(editing.unit||''):''}" /></div>
+            <div class="field"><label>${esc(t('stock'))}</label><input type="number" step="1" min="0" name="stock" required value="${editing?editing.stock:''}" /></div>
+          </div>
+          <div class="form-grid" style="margin-top:10px;">
+            <div class="field"><label>${esc(t('priceRetailGeneral'))}</label><input type="number" step="0.01" min="0" name="priceRetailGeneral" required value="${editing?editing.priceRetailGeneral:''}" /></div>
+            <div class="field"><label>${esc(t('priceRetailMember'))}</label><input type="number" step="0.01" min="0" name="priceRetailMember" required value="${editing?editing.priceRetailMember:''}" /></div>
+            <div class="field"><label>${esc(t('priceWholesaleGeneral'))}</label><input type="number" step="0.01" min="0" name="priceWholesaleGeneral" required value="${editing?editing.priceWholesaleGeneral:''}" /></div>
+            <div class="field"><label>${esc(t('priceWholesaleMember'))}</label><input type="number" step="0.01" min="0" name="priceWholesaleMember" required value="${editing?editing.priceWholesaleMember:''}" /></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button type="submit" class="form-submit">${editing ? esc(t('save')) : esc(t('add'))}</button>
+            ${editing ? `<button type="button" class="icon-btn" id="cancel-edit-btn" style="height:40px;">${esc(t('cancel'))}</button>` : ''}
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>${esc(t('productListTitle'))} (${products.length})</h2>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>${esc(t('productName'))}</th><th>${esc(t('category'))}</th><th>${esc(t('retail'))}/${esc(t('wholesale'))}</th><th>${esc(t('stock'))}</th><th></th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);padding:20px;">${esc(t('noProducts'))}</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCategories(){
+    const usage = {};
+    products.forEach(p=>{ usage[p.category] = (usage[p.category]||0)+1; });
+    return `
+      <div class="panel">
+        <h2>${esc(t('addCategory'))}</h2>
+        <form id="category-form" style="display:flex;gap:8px;">
+          <div class="field" style="flex:1;"><label>${esc(t('categoryName'))}</label><input type="text" name="category" required /></div>
+          <button type="submit" class="form-submit">${esc(t('add'))}</button>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>${esc(t('categoryListTitle'))} (${categories.length})</h2>
+        <div class="chip-list">
+          ${categories.map(c=>`
+            <div class="cat-tag">
+              <span>${esc(c)} <span style="color:var(--ink-soft);font-weight:400;">(${usage[c]||0})</span></span>
+              <button data-del-cat="${esc(c)}" title="${esc(t('del'))}">✕</button>
             </div>
-        `;
-    }
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
 
-    function renderMembers(el) {
-        el.innerHTML = `
-            <div style="padding:20px; width:100%;">
-                <div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px;">
-                    <h3>เพิ่มสมาชิก</h3>
-                    <form id="mem-form" style="display:flex; gap:10px;">
-                        <input type="text" name="name" placeholder="ชื่อสมาชิก" required style="flex:1; padding:8px;">
-                        <input type="text" name="phone" placeholder="เบอร์โทร" style="padding:8px;">
-                        <button type="submit" style="background:var(--primary); color:white; border:none; padding:10px 20px; border-radius:5px;">เพิ่ม</button>
-                    </form>
-                </div>
-                <table class="data-table">
-                    ${members.map(m => `<tr><td>${m.name}</td><td>${m.phone}</td><td><button onclick="delMember('${m.id}')">ลบ</button></td></tr>`).join('')}
-                </table>
-            </div>
-        `;
-        document.getElementById('mem-form').onsubmit = (e) => {
-            e.preventDefault();
-            const fd = new FormData(e.target);
-            members.push({ id: 'm-' + Date.now(), name: fd.get('name'), phone: fd.get('phone') });
-            save(); render();
-        };
-    }
+  function renderMembers(){
+    const editing = memberFormEdit ? members.find(m=>m.id===memberFormEdit) : null;
+    const rows = members.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`
+      <tr>
+        <td>${esc(m.name)}</td>
+        <td class="mono">${esc(m.phone||'—')}</td>
+        <td><div class="row-actions">
+          <button class="icon-btn" data-edit-member="${m.id}">${esc(t('edit'))}</button>
+          <button class="icon-btn danger" data-delete-member="${m.id}">${esc(t('del'))}</button>
+        </div></td>
+      </tr>`).join('');
+    return `
+      <div class="panel">
+        <h2>${editing ? esc(t('edit'))+' '+esc(t('tabMembers')) : esc(t('addMember'))}</h2>
+        <form id="member-form">
+          <div class="form-grid">
+            <div class="field"><label>${esc(t('memberName'))}</label><input type="text" name="name" required value="${editing?esc(editing.name):''}" /></div>
+            <div class="field"><label>${esc(t('memberPhone'))}</label><input type="text" name="phone" value="${editing?esc(editing.phone||''):''}" /></div>
+            <button type="submit" class="form-submit">${editing ? esc(t('save')) : esc(t('add'))}</button>
+            ${editing ? `<button type="button" class="icon-btn" id="cancel-edit-member-btn" style="height:40px;">${esc(t('cancel'))}</button>` : ''}
+          </div>
+        </form>
+      </div>
+      <div class="panel">
+        <h2>${esc(t('memberListTitle'))} (${members.length})</h2>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>${esc(t('memberName'))}</th><th>${esc(t('memberPhone'))}</th><th></th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="3" style="text-align:center;color:var(--ink-soft);padding:20px;">${esc(t('noMembers'))}</td></tr>`}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
 
-    // --- Functions ---
-    window.addToCart = (id) => {
-        const p = products.find(x => x.id === id);
-        const has = cart.find(x => x.id === id);
-        if(has) has.qty++;
-        else cart.push({ id: p.id, name: p.name, price: getPrice(p), qty: 1 });
-        render();
-    };
-    window.updateQty = (id, v) => {
-        const item = cart.find(x => x.id === id);
-        if(item) { item.qty = parseFloat(v) || 1; render(); }
-    };
-    window.rmCart = (id) => { cart = cart.filter(x => x.id !== id); render(); };
-    window.setMember = (id) => {
-        selectedMemberId = id;
-        cart = cart.map(item => {
-            const p = products.find(x => x.id === item.id);
-            return p ? { ...item, price: getPrice(p) } : item;
+  function renderReports(){
+    const cur = t('currency');
+    const today = todayStr();
+    const todaysList = sales.filter(s => s.dateStr === today);
+    const todayRevenue = todaysList.reduce((s,x)=>s+x.total,0);
+    const lowStock = products.filter(p=>p.stock<=10).sort((a,b)=>a.stock-b.stock);
+    const salesByProduct = {};
+    sales.forEach(s => s.items.forEach(it => { salesByProduct[it.name] = (salesByProduct[it.name]||0) + it.qty; }));
+    const topProducts = Object.entries(salesByProduct).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const recent = sales.slice().reverse().slice(0,10);
+
+    return `
+      <div class="stat-row">
+        <div class="stat-card"><div class="slabel">${esc(t('todaySales'))}</div><div class="sval mono">${cur}${money(todayRevenue)}</div></div>
+        <div class="stat-card gold"><div class="slabel">${esc(t('todayBills'))}</div><div class="sval mono">${todaysList.length}</div></div>
+        <div class="stat-card brick"><div class="slabel">${esc(t('lowStockCount'))}</div><div class="sval mono">${lowStock.length}</div></div>
+      </div>
+      <div class="panel">
+        <h2>${esc(t('topProducts'))}</h2>
+        ${topProducts.length ? topProducts.map(([name,qty])=>`<div class="list-item"><span class="li-main">${esc(name)}</span><span class="mono">${qty} ${esc(t('pieces'))}</span></div>`).join('') : `<div class="cart-empty">${esc(t('noSalesData'))}</div>`}
+      </div>
+      <div class="panel">
+        <h2>${esc(t('lowStockList'))}</h2>
+        ${lowStock.length ? lowStock.map(p=>`<div class="list-item"><span class="li-main">${esc(p.name)}</span><span class="mono" style="color:var(--brick);">${p.stock} ${esc(p.unit||'')}</span></div>`).join('') : `<div class="cart-empty">${esc(t('okStock'))}</div>`}
+      </div>
+      <div class="panel">
+        <h2>${esc(t('recentSales'))}</h2>
+        ${recent.length ? recent.map(s=>`
+          <div class="list-item">
+            <div><div class="li-main">${s.items.reduce((a,i)=>a+i.qty,0)} ${esc(t('pieces'))} · ${esc(t(s.mode||'retail'))}</div><div class="li-sub">${fmtTime(s.ts)}</div></div>
+            <span class="mono">${cur}${money(s.total)}</span>
+          </div>`).join('') : `<div class="cart-empty">${esc(t('noSales'))}</div>`}
+        <div class="danger-zone"><button class="danger-link" id="reset-data-btn">${esc(t('resetAll'))}</button></div>
+      </div>
+    `;
+  }
+
+  // ---------- events ----------
+  function attachEvents(){
+    mount.querySelectorAll('[data-lang-btn]').forEach(el=>{
+      el.addEventListener('click', ()=>{ lang = el.dataset.langBtn; activeCategory = null; saveSettings(); render(); });
+    });
+    mount.querySelectorAll('[data-tab]').forEach(el=>{
+      el.addEventListener('click', ()=>{ tab = el.dataset.tab; productFormEdit=null; memberFormEdit=null; render(); });
+    });
+
+    if (tab === 'sell'){
+      mount.querySelectorAll('[data-mode]').forEach(el=>{
+        el.addEventListener('click', ()=>{ saleMode = el.dataset.mode; render(); });
+      });
+      const memberSel = document.getElementById('member-select');
+      if (memberSel) memberSel.addEventListener('change', e=>{ selectedMemberId = e.target.value; render(); });
+
+      const searchEl = document.getElementById('search-input');
+      if (searchEl) searchEl.addEventListener('input', e=>{ searchQuery = e.target.value; render(); preserveFocus('search-input'); });
+
+      mount.querySelectorAll('[data-cat]').forEach(el=>{
+        el.addEventListener('click', ()=>{ activeCategory = el.dataset.cat; render(); });
+      });
+      mount.querySelectorAll('[data-add]').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const pid = el.dataset.add;
+          const prod = products.find(p=>p.id===pid);
+          if (!prod) return;
+          const existing = cart.find(c=>c.id===pid);
+          const currentQty = existing ? existing.qty : 0;
+          if (currentQty >= prod.stock) return;
+          const price = priceFor(prod);
+          if (existing) { existing.qty++; existing.price = price; }
+          else cart.push({id: prod.id, name: prod.name, price, qty: 1});
+          render();
         });
-        render();
-    };
-
-    window.handleQrUpload = (input) => {
-        const file = input.files[0];
-        if(!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            shopQr = e.target.result;
-            save(); render();
-        };
-        reader.readAsDataURL(file);
-    };
-
-    window.showPayModal = () => {
-        if(!cart.length) return;
-        const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
-        const modal = document.createElement('div');
-        modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h2>ยอดชำระ: ฿${total.toLocaleString()}</h2>
-                ${shopQr ? `
-                    <p style="color:var(--primary); font-weight:bold;">${t('transfer')}</p>
-                    <div class="qr-display"><img src="${shopQr}"></div>
-                ` : '<p style="font-size:12px; color:red;">* ยังไม่ได้ตั้งค่า QR ร้านค้า</p>'}
-                <div style="display:flex; gap:10px; margin-top:20px;">
-                    <button onclick="this.parentElement.parentElement.parentElement.remove()" style="flex:1; padding:10px; border:none; background:#eee; border-radius:10px;">ยกเลิก</button>
-                    <button onclick="completeSale()" style="flex:2; padding:10px; border:none; background:var(--primary); color:white; border-radius:10px; font-weight:bold;">${t('checkout')}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    };
-
-    window.completeSale = () => {
-        const total = cart.reduce((s,i)=>s+(i.price*i.qty),0);
-        sales.push({ ts: new Date().toISOString(), total, items: [...cart], memberId: selectedMemberId });
-        cart.forEach(c => {
-            const p = products.find(x => x.id === c.id);
-            if(p) p.stock -= c.qty;
+      });
+      mount.querySelectorAll('[data-cart-id]').forEach(rowEl=>{
+        const cid = rowEl.dataset.cartId;
+        const item = cart.find(c=>c.id===cid);
+        const prod = products.find(p=>p.id===cid);
+        rowEl.querySelectorAll('[data-qty]').forEach(btn=>{
+          btn.addEventListener('click', ()=>{
+            const delta = parseInt(btn.dataset.qty,10);
+            if (delta>0 && prod && item.qty >= prod.stock) return;
+            item.qty += delta;
+            if (item.qty<=0) cart = cart.filter(c=>c.id!==cid);
+            render();
+          });
         });
-        cart = []; selectedMemberId = ''; 
-        save();
-        document.querySelectorAll('.modal').forEach(m => m.remove());
-        render();
-    };
+        const rmBtn = rowEl.querySelector('[data-remove]');
+        if (rmBtn) rmBtn.addEventListener('click', ()=>{ cart = cart.filter(c=>c.id!==cid); render(); });
+      });
+      const cashEl = document.getElementById('cash-input');
+      if (cashEl) cashEl.addEventListener('input', e=>{ cashInput = e.target.value; render(); preserveFocus('cash-input'); });
+      const clearBtn = document.getElementById('clear-cart-btn');
+      if (clearBtn) clearBtn.addEventListener('click', ()=>{ cart=[]; cashInput=''; render(); });
+      const checkoutBtn = document.getElementById('checkout-btn');
+      if (checkoutBtn) checkoutBtn.addEventListener('click', doCheckout);
+      const closeReceiptBtn = document.getElementById('close-receipt-btn');
+      if (closeReceiptBtn) closeReceiptBtn.addEventListener('click', ()=>{ receiptModal = null; render(); });
+      const printBtn = document.getElementById('print-receipt-btn');
+      if (printBtn) printBtn.addEventListener('click', doPrint);
+    }
 
-    window.toggleTagQueue = (id) => {
-        if(tagQueue.includes(id)) tagQueue = tagQueue.filter(x => x !== id);
-        else tagQueue.push(id);
-    };
-
-    window.printBatchTags = () => {
-        if(!tagQueue.length) return alert('กรุณาเลือกสินค้า');
-        const area = document.getElementById('print-area');
-        area.innerHTML = tagQueue.map(id => {
-            const p = products.find(x => x.id === id);
-            return `
-                <div class="price-tag">
-                    <div style="font-size:10px; font-weight:bold;">${p.name}</div>
-                    <div style="font-size:18px; font-weight:900;">฿${(p.priceRetailGeneral||0).toLocaleString()}</div>
-                    <svg class="tag-bc" id="bc-${p.id}"></svg>
-                </div>
-            `;
-        }).join('');
-        tagQueue.forEach(id => {
-            const p = products.find(x => x.id === id);
-            if(p.barcode) JsBarcode("#bc-"+p.id, p.barcode, { height: 30, displayValue: true, fontSize: 10 });
+    if (tab === 'products'){
+      const form = document.getElementById('product-form');
+      if (form) form.addEventListener('submit', onProductFormSubmit);
+      const cancelBtn = document.getElementById('cancel-edit-btn');
+      if (cancelBtn) cancelBtn.addEventListener('click', ()=>{ productFormEdit=null; render(); });
+      mount.querySelectorAll('[data-edit]').forEach(el=>{
+        el.addEventListener('click', ()=>{ productFormEdit = el.dataset.edit; render(); });
+      });
+      mount.querySelectorAll('[data-delete]').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const pid = el.dataset.delete;
+          const p = products.find(x=>x.id===pid);
+          if (p && confirm(`${p.name} — ${t('confirmDeleteProduct')}`)){
+            products = products.filter(x=>x.id!==pid);
+            cart = cart.filter(c=>c.id!==pid);
+            saveProducts();
+            render();
+          }
         });
-        setTimeout(() => { window.print(); tagQueue = []; render(); }, 500);
+      });
+    }
+
+    if (tab === 'categories'){
+      const form = document.getElementById('category-form');
+      if (form) form.addEventListener('submit', e=>{
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const name = (fd.get('category')||'').toString().trim();
+        if (!name || categories.includes(name)) return;
+        categories.push(name);
+        saveCategories();
+        render();
+      });
+      mount.querySelectorAll('[data-del-cat]').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const cname = el.dataset.delCat;
+          const inUse = products.some(p=>p.category===cname);
+          if (inUse){ alert(t('del')+': '+cname+' — '+(lang==='en'?'still used by products':(lang==='lo'?'ຍັງຖືກໃຊ້ໂດຍສິນຄ້າ':'ยังมีสินค้าใช้หมวดหมู่นี้อยู่'))); return; }
+          if (confirm(`${cname} — ${t('confirmDeleteProduct')}`)){
+            categories = categories.filter(c=>c!==cname);
+            saveCategories();
+            render();
+          }
+        });
+      });
+    }
+
+    if (tab === 'members'){
+      const form = document.getElementById('member-form');
+      if (form) form.addEventListener('submit', e=>{
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const name = (fd.get('name')||'').toString().trim();
+        const phone = (fd.get('phone')||'').toString().trim();
+        if (!name) return;
+        if (memberFormEdit){
+          const m = members.find(x=>x.id===memberFormEdit);
+          if (m){ m.name=name; m.phone=phone; }
+          memberFormEdit = null;
+        } else {
+          members.push({id: uid('m'), name, phone});
+        }
+        saveMembers();
+        render();
+      });
+      const cancelBtn = document.getElementById('cancel-edit-member-btn');
+      if (cancelBtn) cancelBtn.addEventListener('click', ()=>{ memberFormEdit=null; render(); });
+      mount.querySelectorAll('[data-edit-member]').forEach(el=>{
+        el.addEventListener('click', ()=>{ memberFormEdit = el.dataset.editMember; render(); });
+      });
+      mount.querySelectorAll('[data-delete-member]').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const mid = el.dataset.deleteMember;
+          const m = members.find(x=>x.id===mid);
+          if (m && confirm(`${m.name} — ${t('confirmDeleteProduct')}`)){
+            members = members.filter(x=>x.id!==mid);
+            if (selectedMemberId===mid) selectedMemberId='';
+            saveMembers();
+            render();
+          }
+        });
+      });
+    }
+
+    if (tab === 'reports'){
+      const resetBtn = document.getElementById('reset-data-btn');
+      if (resetBtn) resetBtn.addEventListener('click', async ()=>{
+        if (confirm(t('confirmReset'))){
+          categories = seedCategories();
+          products = seedProducts();
+          members = [];
+          sales = [];
+          cart = [];
+          selectedMemberId = '';
+          await saveCategories(); await saveProducts(); await saveMembers(); await saveSales();
+          render();
+        }
+      });
+    }
+  }
+
+  function preserveFocus(id){
+    const el = document.getElementById(id);
+    if (el){ el.focus(); const v=el.value; el.value=''; el.value=v; }
+  }
+
+  async function doCheckout(){
+    const total = cartTotal();
+    const cash = parseFloat(cashInput);
+    if (isNaN(cash) || cash < total || cart.length===0) return;
+    const change = cash - total;
+    const ts = new Date().toISOString();
+    const sale = {
+      id: uid('s'), ts, dateStr: todayStr(), mode: saleMode,
+      memberId: selectedMemberId || null,
+      items: cart.map(c=>({id:c.id,name:c.name,price:c.price,qty:c.qty})),
+      total, cash, change
     };
-
-    window.delProduct = (id) => { if(confirm('ลบ?')) { products = products.filter(x => x.id !== id); save(); render(); } };
-    window.delMember = (id) => { if(confirm('ลบ?')) { members = members.filter(x => x.id !== id); save(); render(); } };
-
-    // Start App
+    cart.forEach(c=>{ const p = products.find(x=>x.id===c.id); if (p) p.stock = Math.max(0, p.stock - c.qty); });
+    sales.push(sale);
+    await saveProducts();
+    await saveSales();
+    receiptModal = { ts, total, cash, change, items: sale.items };
+    cart = [];
+    cashInput = '';
     render();
-</script>
+  }
 
-</body>
-</html>
+  function doPrint(){
+    const m = receiptModal;
+    if (!m) return;
+    const cur = t('currency');
+    const memberName = selectedMemberId ? (members.find(x=>x.id===selectedMemberId)||{}).name : '';
+    const lines = m.items.map(i=>`
+      <div class="pr-row"><span>${esc(i.name)} x${i.qty}</span><span>${cur}${money(i.price*i.qty)}</span></div>
+    `).join('');
+    const html = `
+      <div class="pr-shop">${esc(t('appName'))}</div>
+      <div class="pr-sub">${fmtTime(m.ts)}${memberName ? ' · '+esc(memberName) : ''}</div>
+      <hr/>
+      ${lines}
+      <hr/>
+      <div class="pr-row pr-total"><span>${esc(t('grandTotal'))}</span><span>${cur}${money(m.total)}</span></div>
+      <div class="pr-row"><span>${esc(t('cashReceived'))}</span><span>${money(m.cash)}</span></div>
+      <div class="pr-row"><span>${esc(t('change'))}</span><span>${cur}${money(m.change)}</span></div>
+      <hr/>
+      <div class="pr-sub">${esc(t('thankYou'))}</div>
+    `;
+    document.getElementById('print-receipt').innerHTML = html;
+    window.print();
+  }
+
+  function onProductFormSubmit(e){
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const name = (fd.get('name')||'').toString().trim();
+    const category = (fd.get('category')||'').toString().trim();
+    const unit = (fd.get('unit')||'').toString().trim();
+    const stock = parseInt(fd.get('stock'),10);
+    const priceRetailGeneral = parseFloat(fd.get('priceRetailGeneral'));
+    const priceRetailMember = parseFloat(fd.get('priceRetailMember'));
+    const priceWholesaleGeneral = parseFloat(fd.get('priceWholesaleGeneral'));
+    const priceWholesaleMember = parseFloat(fd.get('priceWholesaleMember'));
+    if (!name || !category || isNaN(stock) || [priceRetailGeneral,priceRetailMember,priceWholesaleGeneral,priceWholesaleMember].some(isNaN)) return;
+
+    if (productFormEdit){
+      const p = products.find(x=>x.id===productFormEdit);
+      if (p){ Object.assign(p, {name,category,unit,stock,priceRetailGeneral,priceRetailMember,priceWholesaleGeneral,priceWholesaleMember}); }
+      productFormEdit = null;
+    } else {
+      products.push({id: uid('p'), name, category, unit, stock, priceRetailGeneral, priceRetailMember, priceWholesaleGeneral, priceWholesaleMember});
+    }
+    saveProducts();
+    render();
+  }
+
+  (async function init(){
+    await loadData();
+    render();
+  })();
+})();
+</script>
