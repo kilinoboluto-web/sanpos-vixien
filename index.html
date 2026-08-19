@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ</title>
+<title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂງ</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -68,10 +68,22 @@ th, td { text-align: left; padding: 10px 4px; border-bottom: 1px solid var(--lin
 @media print {
   body * { visibility: hidden; }
   #receipt-print, #receipt-print * { visibility: visible; }
-  #receipt-print { position: absolute; left: 0; top: 0; width: 100%; font-family: 'Kanit', sans-serif; padding: 10px; color: #000; }
+  #receipt-print { position: absolute; left: 0; top: 0; font-family: 'Kanit', sans-serif; padding: 6px; color: #000; }
   .no-print { display: none !important; }
 }
 .receipt-box { font-family: 'IBM Plex Mono', 'Kanit', monospace; padding: 12px; background: #fff; border: 1px dashed #ccc; font-size: 12px; }
+
+/* ขนาดกระดาษพิมพ์ - ปรับความกว้าง/ขนาดตัวอักษรตามที่เลือกในหน้าตั้งค่า */
+body.paper-58mm #receipt-print { width: 58mm; }
+body.paper-58mm .receipt-box { font-size: 10px; padding: 4px; border: none; }
+body.paper-80mm #receipt-print { width: 80mm; }
+body.paper-80mm .receipt-box { font-size: 12px; padding: 6px; border: none; }
+body.paper-a4 #receipt-print { width: 100%; }
+body.paper-a4 .receipt-box { font-size: 14px; padding: 16px; border: none; max-width: 480px; margin: 0 auto; }
+
+.paper-size-option { display:flex; align-items:center; gap:10px; padding:12px; border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px; cursor:pointer; }
+.paper-size-option.active { border-color: var(--p); background: #F0F6F3; }
+.paper-size-option input { width:18px; height:18px; accent-color: var(--p); }
 </style>
 </head>
 <body>
@@ -114,7 +126,7 @@ const App = {
         categories: ["ทั่วไป", "อาหารสด/แช่แข็ง", "น้ำมัน/ของใช้รถ"],
         settings: { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" }
     },
-    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [] },
+    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด' },
 
     init() {
         this.load();
@@ -148,6 +160,7 @@ const App = {
         if(!this.db.settings || typeof this.db.settings !== 'object') {
             this.db.settings = { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" };
         }
+        if(!this.db.settings.paperSize) this.db.settings.paperSize = '80mm';
     },
 
     save() { 
@@ -593,6 +606,23 @@ const App = {
     },
 
     // --- BILL PRINTING SYSTEM ---
+    // ตั้งค่าขนาดกระดาษก่อนสั่งพิมพ์ทุกครั้ง (58mm / 80mm / A4) ตามที่เลือกไว้ในหน้าตั้งค่า
+    applyPrintPaperSize() {
+        const size = (this.db.settings && this.db.settings.paperSize) || '80mm';
+        document.body.classList.remove('paper-58mm', 'paper-80mm', 'paper-a4');
+        document.body.classList.add('paper-' + size);
+
+        let pageStyle = document.getElementById('dynamic-page-size');
+        if(!pageStyle) {
+            pageStyle = document.createElement('style');
+            pageStyle.id = 'dynamic-page-size';
+            document.head.appendChild(pageStyle);
+        }
+        if(size === '58mm') pageStyle.textContent = '@page { size: 58mm auto; margin: 0; }';
+        else if(size === '80mm') pageStyle.textContent = '@page { size: 80mm auto; margin: 0; }';
+        else pageStyle.textContent = '@page { size: A4; margin: 10mm; }';
+    },
+
     printBill(sid) {
         const s = this.db.sales.find(x => x.id === sid);
         if(!s) return;
@@ -696,6 +726,7 @@ const App = {
             </div>
         `;
         printArea.classList.remove('hidden');
+        this.applyPrintPaperSize();
         window.print();
         printArea.classList.add('hidden');
     },
@@ -800,24 +831,11 @@ const App = {
         `;
     },
 
-    payBillDebt(sid) {
-        const s = this.db.sales.find(x => x.id === sid);
-        if(!s) return;
-        const m = this.db.members.find(x => x.id === s.memberId);
-        const amt = prompt(`ยอดค้างชำระ ฿${s.debtRemaining} ชำระกี่บาท?`, s.debtRemaining);
-        if(amt && parseFloat(amt) > 0) {
-            const pay = parseFloat(amt);
-            s.debtRemaining -= pay;
-            if(m) m.debt = Math.max(0, (m.debt || 0) - pay);
-            if(s.debtRemaining <= 0) s.status = 'paid';
-            this.save(); this.render();
-            alert("✅ บันทึกการชำระหนี้สำเร็จ");
-        }
-    },
-
     // --- STOCK & DYNAMIC CATEGORY MANAGEMENT ---
     viewStock(root) {
         const isEditing = !!this.state.editingProductId;
+        if(!this.state.stockSearch) this.state.stockSearch = '';
+        if(!this.state.stockCat) this.state.stockCat = 'ทั้งหมด';
         root.innerHTML = `
             <div class="card">
                 <h3 style="margin-top:0">🏷️ จัดการหมวดหมู่สินค้า</h3>
@@ -825,11 +843,12 @@ const App = {
                     <input type="text" id="new_cat_input" class="input-main" style="margin-bottom:0" placeholder="พิมพ์ชื่อหมวดหมู่ใหม่ที่ต้องการ...">
                     <button type="button" class="btn btn-p" style="width:110px; padding:10px; border-radius:12px; font-size:13px;" onclick="App.addCategoryFromInput()">+ เพิ่ม</button>
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                <div style="display:flex; flex-wrap:wrap; gap:6px;" id="cat-chip-list">
                     ${this.db.categories.map((c, idx) => `
-                        <span style="background:#E2E8E0; padding:6px 12px; border-radius:15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; color:var(--ink);">
-                            ${c}
-                            ${this.db.categories.length > 1 ? `<b onclick="App.deleteCategory(${idx})" style="color:var(--err); cursor:pointer; font-size:14px;">×</b>` : ''}
+                        <span class="cat-chip" data-idx="${idx}" style="background:#E2E8E0; padding:6px 10px; border-radius:15px; font-size:12px; display:inline-flex; align-items:center; gap:6px; color:var(--ink);">
+                            <span class="cat-chip-text">${c}</span>
+                            <b onclick="App.startRenameCategory(${idx})" style="color:var(--p); cursor:pointer; font-size:13px;" title="แก้ไขชื่อ">✏️</b>
+                            ${this.db.categories.length > 1 ? `<b onclick="App.deleteCategory(${idx})" style="color:var(--err); cursor:pointer; font-size:14px;" title="ลบ">×</b>` : ''}
                         </span>
                     `).join('')}
                 </div>
@@ -853,7 +872,7 @@ const App = {
                             <button type="button" class="btn btn-outline" style="padding:10px; font-size:12px;" onclick="document.getElementById('pimg_file').click()">📸 ถ่ายรูป / เลือกไฟล์</button>
                             <button type="button" class="btn btn-outline" style="padding:10px; font-size:12px;" onclick="App.pasteImageFromClipboard()">📋 วางรูปจากคลิปบอร์ด</button>
                         </div>
-                        <small style="display:block; margin-top:4px; color:var(--ink-s); font-size:10px;">คัดลอกรูปจาก Google หรือแอปอื่นมาก่อน แล้วกด "วางรูปจากคลิปบอร์ด" ได้เลย ไม่ต้องดาวน์โหลดเก็บในเครื่อง</small>
+                        <small style="display:block; margin-top:4px; color:var(--ink-s); font-size:10px;">คัดลอกรูปจาก Google หรือแอปอื่นมาก่อน แล้วกด "วางรูปจากคลิปบอร์ด" ได้เลย ไม่ต้องดาวน์โหลดเก็บในเครื่อง รูปจะถูกครอปให้เต็มพอดีช่องแสดงในหน้าขายอัตโนมัติ</small>
                         <input type="hidden" id="pimg_data">
                         <div id="img-preview" style="margin-top:8px; text-align:center;"></div>
                     </div>
@@ -897,28 +916,171 @@ const App = {
                         <button class="btn btn-p" ${this.state.labelSelected.length===0?'disabled style="opacity:0.5"':''} onclick="App.printLabels()">🖨️ พิมพ์ป้ายที่เลือก (${this.state.labelSelected.length})</button>
                     </div>
                 ` : ''}
-                <div style="max-height:300px; overflow-y:auto; margin-top:8px;">
-                    ${this.db.products.map(p => `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                ${this.state.labelMode ? `<input type="checkbox" ${this.state.labelSelected.includes(p.id)?'checked':''} onchange="App.toggleLabelSelect('${p.id}')" style="width:20px; height:20px; flex-shrink:0;">` : ''}
-                                <img src="${p.img || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:8px; object-fit:cover;">
-                                <div>
-                                    <b>${p.name}</b> <small style="color:var(--ink-s);">(${p.category||'ทั่วไป'})</small><br>
-                                    <small class="mono">฿${p.pr1} | รหัส: ${p.bc||'-'} | คงเหลือ: ${p.stock}</small>
-                                </div>
-                            </div>
-                            <div style="display:flex; gap:6px;">
-                                ${this.state.labelMode ? '' : `
-                                    <button onclick="App.editP('${p.id}')" style="color:var(--p); border:none; background:none; cursor:pointer; font-size:16px;">✏️</button>
-                                    <button onclick="App.deleteP('${p.id}')" style="color:var(--err); border:none; background:none; cursor:pointer; font-size:16px;">🗑️</button>
-                                `}
-                            </div>
-                        </div>
-                    `).join('') || '<div style="text-align:center; padding:10px;">ยังไม่มีรายการสินค้าในคลัง</div>'}
+
+                <input type="text" id="stock_search" class="input-main" style="margin-top:10px; margin-bottom:8px;" placeholder="🔍 ค้นหาชื่อสินค้าในคลัง..." value="${this.state.stockSearch}" oninput="App.filterStockList()">
+                <div class="cat-bar" style="margin-bottom:0;" id="stock-cat-bar">
+                    <button class="cat-btn ${this.state.stockCat==='ทั้งหมด'?'active':''}" onclick="App.filterStockCat('ทั้งหมด')">ทั้งหมด</button>
+                    ${this.db.categories.map(c => `<button class="cat-btn ${this.state.stockCat===c?'active':''}" onclick="App.filterStockCat('${c}')">${c}</button>`).join('')}
+                </div>
+
+                <div style="max-height:300px; overflow-y:auto; margin-top:8px;" id="stock-list">
+                    ${this.renderStockListItems()}
                 </div>
             </div>
         `;
+    },
+
+    // กรองรายการคลังสินค้าตามคำค้นหา + หมวดหมู่ที่เลือก
+    getFilteredStockProducts() {
+        const q = (this.state.stockSearch || '').trim().toLowerCase();
+        const cat = this.state.stockCat || 'ทั้งหมด';
+        return this.db.products.filter(p => {
+            const matchQ = !q || p.name.toLowerCase().includes(q) || (p.bc||'').toString().toLowerCase().includes(q);
+            const matchCat = cat === 'ทั้งหมด' || (p.category || 'ทั่วไป') === cat;
+            return matchQ && matchCat;
+        });
+    },
+
+    renderStockListItems() {
+        const list = this.getFilteredStockProducts();
+        return list.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee">
+                <div style="display:flex; align-items:center; gap:10px; flex:1; cursor:${this.state.labelMode ? 'default' : 'pointer'};" ${this.state.labelMode ? '' : `onclick="App.openQuickEdit('${p.id}')"`}>
+                    ${this.state.labelMode ? `<input type="checkbox" ${this.state.labelSelected.includes(p.id)?'checked':''} onchange="App.toggleLabelSelect('${p.id}')" style="width:20px; height:20px; flex-shrink:0;">` : ''}
+                    <img src="${p.img || 'https://via.placeholder.com/40'}" style="width:40px; height:40px; border-radius:8px; object-fit:cover; flex-shrink:0;">
+                    <div>
+                        <b>${p.name}</b> <small style="color:var(--ink-s);">(${p.category||'ทั่วไป'})</small><br>
+                        <small class="mono">฿${p.pr1} | รหัส: ${p.bc||'-'} | คงเหลือ: ${p.stock}</small>
+                    </div>
+                </div>
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                    ${this.state.labelMode ? '' : `
+                        <button onclick="event.stopPropagation(); App.editP('${p.id}')" style="color:var(--p); border:none; background:none; cursor:pointer; font-size:16px;" title="แก้ไขข้อมูลทั้งหมด">✏️</button>
+                        <button onclick="event.stopPropagation(); App.deleteP('${p.id}')" style="color:var(--err); border:none; background:none; cursor:pointer; font-size:16px;" title="ลบสินค้า">🗑️</button>
+                    `}
+                </div>
+            </div>
+        `).join('') || '<div style="text-align:center; padding:10px;">ไม่พบสินค้าที่ค้นหา</div>';
+    },
+
+    filterStockList() {
+        const input = document.getElementById('stock_search');
+        this.state.stockSearch = input ? input.value : '';
+        const list = document.getElementById('stock-list');
+        if(list) list.innerHTML = this.renderStockListItems();
+    },
+
+    filterStockCat(cat) {
+        this.state.stockCat = cat;
+        document.querySelectorAll('#stock-cat-bar .cat-btn').forEach(b => b.classList.toggle('active', b.innerText === cat));
+        const list = document.getElementById('stock-list');
+        if(list) list.innerHTML = this.renderStockListItems();
+    },
+
+    // --- แก้ไขราคา/สต๊อกแบบเร็ว (popup) ---
+    openQuickEdit(id) {
+        const p = this.db.products.find(x => x.id === id);
+        if(!p) { alert("⚠️ ไม่พบข้อมูลสินค้านี้ (id: " + id + ") กรุณาลองรีเฟรชหน้าเว็บแล้วลองใหม่"); return; }
+        this.openM(`
+            <h3 style="margin-top:0">✏️ แก้ไขด่วน: ${p.name}</h3>
+            <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">หมวดหมู่</label>
+            <select id="qe_cat" class="input-main">
+                ${this.db.categories.map(c=>`<option value="${c}" ${((p.category||'ทั่วไป')===c)?'selected':''}>${c}</option>`).join('')}
+            </select>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <div>
+                    <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">ต้นทุน (บาท)</label>
+                    <input type="number" id="qe_cost" class="input-main" style="margin-bottom:0" value="${p.cost||0}" step="0.01">
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">จำนวนสต๊อก</label>
+                    <input type="number" id="qe_stock" class="input-main" style="margin-bottom:0" value="${p.stock||0}">
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">ราคาขายปลีก</label>
+                    <input type="number" id="qe_pr1" class="input-main" style="margin-bottom:0" value="${p.pr1||0}">
+                </div>
+                <div>
+                    <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">ราคาขายส่ง</label>
+                    <input type="number" id="qe_pw1" class="input-main" style="margin-bottom:0" value="${p.pw1||0}">
+                </div>
+            </div>
+            <button class="btn btn-p" style="width:100%; margin-top:14px;" onclick="App.saveQuickEdit('${p.id}')">💾 บันทึก</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.closeM(); App.editP('${p.id}')">แก้ไขข้อมูลอื่น (ชื่อ/รูป/บาร์โค้ด) →</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.closeM()">ยกเลิก</button>
+        `);
+    },
+
+    saveQuickEdit(id) {
+        const idx = this.db.products.findIndex(x => x.id === id);
+        if(idx === -1) return;
+        const cat = document.getElementById('qe_cat').value;
+        const cost = parseFloat(document.getElementById('qe_cost').value) || 0;
+        const stock = parseInt(document.getElementById('qe_stock').value) || 0;
+        const pr1 = parseFloat(document.getElementById('qe_pr1').value) || 0;
+        const pw1 = parseFloat(document.getElementById('qe_pw1').value) || 0;
+        this.db.products[idx] = { ...this.db.products[idx], category: cat, cost, stock, pr1, pw1 };
+        this.save();
+        this.closeM();
+        this.render();
+        alert("✅ อัปเดตราคา/สต๊อกเรียบร้อยแล้ว");
+    },
+
+    // --- แก้ไขชื่อหมวดหมู่เดิม (เปลี่ยนชื่อในสินค้าทุกตัวที่อยู่หมวดนั้นด้วย) ---
+    startRenameCategory(idx) {
+        const chip = document.querySelectorAll('#cat-chip-list .cat-chip')[idx];
+        if(!chip) return;
+        const textEl = chip.querySelector('.cat-chip-text');
+        const oldName = this.db.categories[idx];
+        if(chip.querySelector('input')) return;
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = oldName;
+        input.className = 'input-main';
+        input.style.cssText = 'margin-bottom:0; width:110px; padding:4px 8px; font-size:12px; border-radius:8px;';
+        input.onkeydown = (e) => { if(e.key==='Enter'){ e.preventDefault(); App.confirmRenameCategory(idx, input.value); } };
+        textEl.replaceWith(input);
+        input.focus();
+        input.select();
+
+        const editIcon = chip.children[1];
+        editIcon.textContent = '✓';
+        editIcon.style.color = 'var(--ok)';
+        editIcon.onclick = () => this.confirmRenameCategory(idx, input.value);
+    },
+
+    confirmRenameCategory(idx, newNameRaw) {
+        const newName = (newNameRaw || '').trim();
+        const oldName = this.db.categories[idx];
+        if(!newName || newName === oldName) { this.render(); return; }
+        if(this.db.categories.includes(newName)) {
+            alert("⚠️ มีหมวดหมู่นี้ในระบบแล้ว");
+            this.render();
+            return;
+        }
+        this.db.categories[idx] = newName;
+        this.db.products.forEach(p => {
+            if((p.category || 'ทั่วไป') === oldName) p.category = newName;
+        });
+        this.save();
+        this.render();
+        alert(`✅ เปลี่ยนชื่อหมวดหมู่ "${oldName}" เป็น "${newName}" เรียบร้อยแล้ว`);
+    },
+
+    payBillDebt(sid) {
+        const s = this.db.sales.find(x => x.id === sid);
+        if(!s) return;
+        const m = this.db.members.find(x => x.id === s.memberId);
+        const amt = prompt(`ยอดค้างชำระ ฿${s.debtRemaining} ชำระกี่บาท?`, s.debtRemaining);
+        if(amt && parseFloat(amt) > 0) {
+            const pay = parseFloat(amt);
+            s.debtRemaining -= pay;
+            if(m) m.debt = Math.max(0, (m.debt || 0) - pay);
+            if(s.debtRemaining <= 0) s.status = 'paid';
+            this.save(); this.render();
+            alert("✅ บันทึกการชำระหนี้สำเร็จ");
+        }
     },
 
     toggleLabelMode() {
@@ -965,6 +1127,11 @@ const App = {
                     try { JsBarcode(el, p.id, { format: "CODE128", displayValue: true, fontSize: 10, height: 35, width: 1.3, margin: 2 }); } catch(e2) {}
                 }
             });
+            document.body.classList.remove('paper-58mm', 'paper-80mm', 'paper-a4');
+            document.body.classList.add('paper-a4'); // ป้ายราคาพิมพ์เป็นแผ่น A4 เสมอ (จัด 3 ดวง/แถว)
+            let pageStyle = document.getElementById('dynamic-page-size');
+            if(!pageStyle) { pageStyle = document.createElement('style'); pageStyle.id = 'dynamic-page-size'; document.head.appendChild(pageStyle); }
+            pageStyle.textContent = '@page { size: A4; margin: 10mm; }';
             window.print();
             printArea.classList.add('hidden');
             printArea.innerHTML = '';
@@ -1165,33 +1332,30 @@ const App = {
         if(!confirm(`ต้องการลบหมวดหมู่ "${catName}" หรือไม่?`)) return;
         this.db.categories.splice(idx, 1);
         if(this.db.categories.length === 0) this.db.categories = ["ทั่วไป"];
+        if(this.state.stockCat === catName) this.state.stockCat = 'ทั้งหมด';
         this.save();
         this.render();
     },
 
-    // ประมวลผลรูปภาพ (ย่อขนาด+บีบอัด) จาก File หรือ Blob แล้วคืนค่าเป็น base64 - ใช้ร่วมกันทั้งถ่ายรูป/เลือกไฟล์/วางจากคลิปบอร์ด
+    // ประมวลผลรูปภาพ (ครอปกึ่งกลางให้เป็นสี่เหลี่ยมจัตุรัส + ย่อขนาด + บีบอัด) จาก File หรือ Blob แล้วคืนค่าเป็น base64
+    // ครอปเป็นสี่เหลี่ยมจัตุรัสตั้งแต่ตอนบันทึก เพื่อให้รูปแสดงเต็มพอดีช่องในหน้าขายสินค้าเสมอ ไม่ว่าไฟล์ต้นฉบับจะเป็นแนวตั้ง แนวนอน หรือสี่เหลี่ยม
     processImageToBase64(fileOrBlob) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
                 img.onload = () => {
+                    const outSize = 300; // ขนาดรูปสี่เหลี่ยมจัตุรัสที่จะบันทึก
+                    const srcSize = Math.min(img.width, img.height); // ด้านสั้นสุดของภาพต้นฉบับ
+                    const srcX = (img.width - srcSize) / 2;   // ครอปจากกึ่งกลางแนวนอน
+                    const srcY = (img.height - srcSize) / 2;  // ครอปจากกึ่งกลางแนวตั้ง
+
                     const canvas = document.createElement('canvas');
-                    const maxSize = 300;
-                    let width = img.width;
-                    let height = img.height;
-
-                    if (width > height) {
-                        if (width > maxSize) { height *= maxSize / width; width = maxSize; }
-                    } else {
-                        if (height > maxSize) { width *= maxSize / height; height = maxSize; }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
+                    canvas.width = outSize;
+                    canvas.height = outSize;
                     const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
+                    resolve(canvas.toDataURL('image/jpeg', 0.8));
                 };
                 img.onerror = reject;
                 img.src = event.target.result;
@@ -1321,6 +1485,22 @@ const App = {
                 <input type="text" id="sname" class="input-main" value="${this.db.settings.storeName || ''}">
                 <button class="btn btn-p" onclick="App.saveSettings()">บันทึกชื่อร้าน</button>
             </div>
+            <div class="card">
+                <h3 style="margin-top:0">🖨️ ขนาดกระดาษพิมพ์ใบเสร็จ</h3>
+                <p style="font-size:12px; color:var(--ink-s); margin-top:0;">เลือกให้ตรงกับกระดาษที่ใช้จริง เพื่อให้พิมพ์พอดี ไม่ล้นหรือขาดหาย (ป้ายราคาจะพิมพ์เป็น A4 เสมอ ไม่ขึ้นกับค่านี้)</p>
+                <label class="paper-size-option ${this.db.settings.paperSize==='58mm'?'active':''}">
+                    <input type="radio" name="paperSize" value="58mm" ${this.db.settings.paperSize==='58mm'?'checked':''} onchange="App.savePaperSize('58mm')">
+                    <div><b style="font-size:13px;">58mm</b><br><small style="color:var(--ink-s);">ม้วนความร้อนขนาดเล็ก</small></div>
+                </label>
+                <label class="paper-size-option ${this.db.settings.paperSize==='80mm'?'active':''}">
+                    <input type="radio" name="paperSize" value="80mm" ${this.db.settings.paperSize==='80mm'?'checked':''} onchange="App.savePaperSize('80mm')">
+                    <div><b style="font-size:13px;">80mm</b><br><small style="color:var(--ink-s);">ม้วนความร้อนมาตรฐาน (แนะนำ)</small></div>
+                </label>
+                <label class="paper-size-option ${this.db.settings.paperSize==='a4'?'active':''}" style="margin-bottom:0;">
+                    <input type="radio" name="paperSize" value="a4" ${this.db.settings.paperSize==='a4'?'checked':''} onchange="App.savePaperSize('a4')">
+                    <div><b style="font-size:13px;">A4</b><br><small style="color:var(--ink-s);">กระดาษทั่วไป / เครื่องพิมพ์อิงค์เจ็ท-เลเซอร์</small></div>
+                </label>
+            </div>
             <div class="card"><h3>📤 สำรองข้อมูล (Backup)</h3><button class="btn btn-s" onclick="App.exportJ()">ดาวน์โหลดไฟล์สำรองข้อมูล (.json)</button></div>
             <div class="card"><h3>📥 นำเข้าข้อมูล (Import)</h3><input type="file" class="input-main" onchange="App.importJ(event)"></div>
         `;
@@ -1333,6 +1513,12 @@ const App = {
             alert("✅ บันทึกชื่อร้านค้าเรียบร้อยแล้ว");
             location.reload();
         }
+    },
+
+    savePaperSize(size) {
+        this.db.settings.paperSize = size;
+        this.save();
+        this.render();
     },
     exportJ() {
         const b = new Blob([JSON.stringify(this.db)], {type:'application/json'});
@@ -1450,6 +1636,13 @@ const App = {
 window.addEventListener('DOMContentLoaded', () => {
     App.init();
 });
+
+// แจ้งเตือนถ้าเกิด error ระหว่างใช้งาน (เช่น กดปุ่มแล้วไม่มีอะไรเกิดขึ้น) จะได้เห็นสาเหตุแทนที่จะเงียบ
+window.addEventListener('error', (e) => {
+    console.error('App error:', e.message, e.filename, e.lineno);
+    alert("⚠️ เกิดข้อผิดพลาด: " + e.message + " (บรรทัด " + e.lineno + ")");
+});
+
 </script>
 </body>
 </html>
