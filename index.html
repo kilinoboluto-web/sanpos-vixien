@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂງ</title>
+<title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -126,10 +126,48 @@ const App = {
         categories: ["ทั่วไป", "อาหารสด/แช่แข็ง", "น้ำมัน/ของใช้รถ"],
         settings: { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" }
     },
-    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด' },
+    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', unlocked: false },
 
-    init() {
-        this.load();
+    // --- IndexedDB storage layer (เก็บข้อมูลอิงพื้นที่ว่างจริงของเครื่อง แทน localStorage ที่มีโควต้าจำกัดแค่ 5-10MB) ---
+    IDB_NAME: 'sanpos_v15_idb',
+    IDB_STORE: 'kv',
+    LS_KEY: 'sanpos_v15_db',
+
+    _openIDB() {
+        return new Promise((resolve, reject) => {
+            if(!window.indexedDB) { reject(new Error('IndexedDB not supported')); return; }
+            const req = indexedDB.open(this.IDB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const idb = e.target.result;
+                if(!idb.objectStoreNames.contains(this.IDB_STORE)) {
+                    idb.createObjectStore(this.IDB_STORE);
+                }
+            };
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    },
+    async _idbGet(key) {
+        const idb = await this._openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = idb.transaction(this.IDB_STORE, 'readonly');
+            const req = tx.objectStore(this.IDB_STORE).get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+    async _idbSet(key, value) {
+        const idb = await this._openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = idb.transaction(this.IDB_STORE, 'readwrite');
+            const req = tx.objectStore(this.IDB_STORE).put(value, key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+        });
+    },
+
+    async init() {
+        await this.load();
         this.bind();
         this.render();
         setInterval(() => {
@@ -138,15 +176,28 @@ const App = {
         }, 1000);
     },
 
-    load() {
+    async load() {
         try {
-            const d = localStorage.getItem('sanpos_v15_db');
-            if(d) {
-                this.db = JSON.parse(d);
+            let d = await this._idbGet(this.LS_KEY);
+            if(!d) {
+                // ยังไม่เคยมีข้อมูลใน IndexedDB -> ลองย้ายข้อมูลเก่าจาก localStorage มาให้อัตโนมัติ (ครั้งเดียว)
+                const old = localStorage.getItem(this.LS_KEY);
+                if(old) {
+                    d = JSON.parse(old);
+                    await this._idbSet(this.LS_KEY, d);
+                    localStorage.removeItem(this.LS_KEY);
+                }
             }
+            if(d) this.db = d;
         } catch(e) {
-            console.error("Local database error, resetting structure:", e);
-            this.db = {};
+            console.error("IndexedDB load error, falling back to localStorage:", e);
+            try {
+                const d = localStorage.getItem(this.LS_KEY);
+                if(d) this.db = JSON.parse(d);
+            } catch(e2) {
+                console.error("Local database error, resetting structure:", e2);
+                this.db = {};
+            }
         }
 
         // Defensive checks to ensure structural integrity
@@ -163,11 +214,16 @@ const App = {
         if(!this.db.settings.paperSize) this.db.settings.paperSize = '80mm';
     },
 
-    save() { 
+    async save() {
         try {
-            localStorage.setItem('sanpos_v15_db', JSON.stringify(this.db)); 
+            await this._idbSet(this.LS_KEY, this.db);
         } catch(e) {
-            alert("⚠️ พื้นที่จัดเก็บความจำในเครื่องเต็ม ไม่สามารถบันทึกข้อมูลได้");
+            console.error("IndexedDB save error:", e);
+            try {
+                localStorage.setItem(this.LS_KEY, JSON.stringify(this.db));
+            } catch(e2) {
+                alert("⚠️ ไม่สามารถบันทึกข้อมูลได้ กรุณาลองปิดแล้วเปิดเบราว์เซอร์ใหม่ หรือตรวจสอบพื้นที่ว่างในเครื่อง");
+            }
         }
     },
 
@@ -388,6 +444,7 @@ const App = {
             const isLow = p.stock <= 5;
             return `
                 <div class="p-card" onclick="App.selectPrice('${p.id}')">
+                    <button onclick="event.stopPropagation(); App.openQuickEdit('${p.id}')" title="แก้ไขราคา/สต๊อกด่วน" style="position:absolute; top:6px; left:6px; width:24px; height:24px; border:none; border-radius:8px; background:rgba(255,255,255,0.92); box-shadow:0 1px 4px rgba(0,0,0,0.2); font-size:12px; cursor:pointer; z-index:2; display:flex; align-items:center; justify-content:center;">✏️</button>
                     <div class="p-tag ${isLow?'low-stock':''}">${isLow?'เหลือน้อย: ':''}${p.stock}</div>
                     <img src="${p.img || 'https://via.placeholder.com/100?text=No+Image'}">
                     <div style="font-size:12px;font-weight:600;height:32px;overflow:hidden;margin-top:4px;">${p.name}</div>
@@ -979,6 +1036,9 @@ const App = {
 
     // --- แก้ไขราคา/สต๊อกแบบเร็ว (popup) ---
     openQuickEdit(id) {
+        this.checkAuth(() => this._openQuickEdit(id));
+    },
+    _openQuickEdit(id) {
         const p = this.db.products.find(x => x.id === id);
         if(!p) { alert("⚠️ ไม่พบข้อมูลสินค้านี้ (id: " + id + ") กรุณาลองรีเฟรชหน้าเว็บแล้วลองใหม่"); return; }
         this.openM(`
@@ -1253,6 +1313,9 @@ const App = {
 
     // โหลดข้อมูลเข้าฟอร์มเมื่อกดแก้ไข
     editP(id) {
+        this.checkAuth(() => this._editP(id));
+    },
+    _editP(id) {
         const p = this.db.products.find(x => x.id === id);
         if(!p) return;
         this.state.editingProductId = id;
@@ -1442,6 +1505,9 @@ const App = {
     },
 
     deleteP(id) {
+        this.checkAuth(() => this._deleteP(id));
+    },
+    _deleteP(id) {
         if(!confirm("ยืนยันลบสินค้านี้ออกจากระบบ?")) return;
         this.db.products = this.db.products.filter(x => x.id !== id);
         this.save(); this.render();
@@ -1501,15 +1567,29 @@ const App = {
                     <div><b style="font-size:13px;">A4</b><br><small style="color:var(--ink-s);">กระดาษทั่วไป / เครื่องพิมพ์อิงค์เจ็ท-เลเซอร์</small></div>
                 </label>
             </div>
+            <div class="card">
+                <h3 style="margin-top:0">🔒 รหัสผ่านแก้ไขสินค้า</h3>
+                <p style="font-size:12px; color:var(--ink-s); margin-top:0;">
+                    ${this.db.settings.editPassword
+                        ? 'เปิดใช้งานอยู่ — ต้องใส่รหัสผ่านก่อนถึงจะแก้ไข/ลบสินค้าได้ (ใส่ครั้งเดียวต่อการเปิดแอปหนึ่งครั้ง)'
+                        : 'ยังไม่ได้ตั้งรหัสผ่าน — ตอนนี้ใครก็แก้ไข/ลบสินค้าได้ทันที'}
+                </p>
+                <label style="font-size:12px; color:var(--ink-s);">${this.db.settings.editPassword ? 'ตั้งรหัสผ่านใหม่' : 'ตั้งรหัสผ่าน'}</label>
+                <input type="password" id="edit_pw" class="input-main" placeholder="รหัสผ่านใหม่">
+                <label style="font-size:12px; color:var(--ink-s);">ยืนยันรหัสผ่านอีกครั้ง</label>
+                <input type="password" id="edit_pw2" class="input-main" placeholder="พิมพ์รหัสผ่านซ้ำ">
+                <button class="btn btn-p" onclick="App.saveEditPassword()">บันทึกรหัสผ่าน</button>
+                ${this.db.settings.editPassword ? `<button class="btn btn-outline" style="margin-top:8px;" onclick="App.removeEditPassword()">ปิดใช้งานรหัสผ่าน</button>` : ''}
+            </div>
             <div class="card"><h3>📤 สำรองข้อมูล (Backup)</h3><button class="btn btn-s" onclick="App.exportJ()">ดาวน์โหลดไฟล์สำรองข้อมูล (.json)</button></div>
             <div class="card"><h3>📥 นำเข้าข้อมูล (Import)</h3><input type="file" class="input-main" onchange="App.importJ(event)"></div>
         `;
     },
-    saveSettings() {
+    async saveSettings() {
         const sInput = document.getElementById('sname');
         if(sInput) {
             this.db.settings.storeName = sInput.value;
-            this.save();
+            await this.save();
             alert("✅ บันทึกชื่อร้านค้าเรียบร้อยแล้ว");
             location.reload();
         }
@@ -1528,17 +1608,64 @@ const App = {
     importJ(e) {
         const f = e.target.files[0]; if(!f) return;
         const r = new FileReader();
-        r.onload = ev => {
+        r.onload = async ev => {
             try {
-                this.db = JSON.parse(ev.target.result);
-                this.save();
+                const parsed = JSON.parse(ev.target.result);
+                this.db = parsed;
+                await this.save();
                 alert("✅ นำเข้าข้อมูลเรียบร้อยแล้ว");
                 location.reload();
             } catch(err) {
+                console.error("Import error:", err);
                 alert("❌ ไฟล์ไม่ถูกต้อง กรุณาเลือกไฟล์ .json ของระบบ SanPOS");
             }
         }; 
         r.readAsText(f);
+    },
+
+    // --- ระบบรหัสผ่านป้องกันการแก้ไขสินค้า ---
+    checkAuth(cb) {
+        if(!this.db.settings.editPassword) { cb(); return; } // ยังไม่ได้ตั้งรหัสผ่าน -> แก้ไขได้เลย
+        if(this.state.unlocked) { cb(); return; } // ปลดล็อกแล้วในเซสชันนี้
+        this.pendingAuthCb = cb;
+        this.openM(`
+            <h3 style="margin-top:0">🔒 ใส่รหัสผ่านเพื่อแก้ไขสินค้า</h3>
+            <input type="password" id="auth_pw" class="input-main" placeholder="รหัสผ่าน" autofocus onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.submitAuth(); }">
+            <button class="btn btn-p" style="width:100%;" onclick="App.submitAuth()">ยืนยัน</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.pendingAuthCb=null; App.closeM()">ยกเลิก</button>
+        `);
+        setTimeout(() => { const el = document.getElementById('auth_pw'); if(el) el.focus(); }, 200);
+    },
+    submitAuth() {
+        const el = document.getElementById('auth_pw');
+        const val = el ? el.value : '';
+        if(val === this.db.settings.editPassword) {
+            this.state.unlocked = true;
+            this.closeM();
+            const cb = this.pendingAuthCb;
+            this.pendingAuthCb = null;
+            if(cb) cb();
+        } else {
+            alert("❌ รหัสผ่านไม่ถูกต้อง");
+        }
+    },
+    saveEditPassword() {
+        const val = (document.getElementById('edit_pw')?.value || '').trim();
+        const confirmVal = (document.getElementById('edit_pw2')?.value || '').trim();
+        if(!val) { alert("⚠️ กรุณากรอกรหัสผ่าน"); return; }
+        if(val !== confirmVal) { alert("⚠️ รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
+        this.db.settings.editPassword = val;
+        this.state.unlocked = true;
+        this.save();
+        alert("✅ ตั้งรหัสผ่านเรียบร้อยแล้ว");
+        this.render();
+    },
+    removeEditPassword() {
+        if(!confirm("ต้องการปิดใช้งานรหัสผ่านหรือไม่? หลังจากนี้ใครก็สามารถแก้ไขสินค้าได้โดยไม่ต้องใส่รหัสผ่าน")) return;
+        delete this.db.settings.editPassword;
+        this.save();
+        alert("✅ ปิดใช้งานรหัสผ่านเรียบร้อยแล้ว");
+        this.render();
     },
 
     // --- HELPERS & SCANNER ---
