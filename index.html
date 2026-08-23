@@ -111,6 +111,7 @@ body.paper-a4 .receipt-box { font-size: 14px; padding: 16px; border: none; max-w
         <button class="tab-btn" data-v="stock">📦 สต๊อก</button>
         <button class="tab-btn" data-v="member">👥 สมาชิก</button>
         <button class="tab-btn" data-v="sync">🔄 Sync</button>
+        <button class="tab-btn" data-v="customers">👥 ลูกค้าออนไลน์</button>
     </div>
 </div>
 
@@ -136,7 +137,7 @@ const App = {
         categories: ["ทั่วไป", "อาหารสด/แช่แข็ง", "น้ำมัน/ของใช้รถ"],
         settings: { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" }
     },
-    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null, pendingCustomers: [], newOrders: [] },
+    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null, pendingCustomers: [], newOrders: [], allCustomers: [], customerSearch: '' },
 
     init() {
         this.loadingScreen(true);
@@ -262,10 +263,15 @@ const App = {
         if(cfg && cfg.enabled && cfg.url && cfg.token) {
             try {
                 const cloudData = await this.cloudPull();
-                if(cloudData && Object.keys(cloudData).length > 0) {
+                if(this.isMeaningfulData(cloudData)) {
+                    // คลาวด์มีข้อมูลจริง -> ใช้แทนข้อมูลในเครื่อง
                     this.db = cloudData;
                     this.ensureSchemaDefaults();
                     await this.idbSet('sanpos_v15_db', this.db); // เก็บสำรองไว้ในเครื่องด้วย เผื่อเน็ตหลุดครั้งหน้า
+                } else if(this.isMeaningfulData(this.db)) {
+                    // คลาวด์ว่างเปล่า แต่เครื่องนี้มีข้อมูลจริงอยู่ -> ห้ามทับเด็ดขาด! เก็บของเครื่องไว้ แล้วส่งขึ้นไปซ่อมคลาวด์ให้กลับมาตรงกัน
+                    console.warn('ข้อมูลบนคลาวด์ว่างเปล่าแต่เครื่องนี้มีข้อมูลอยู่ - ใช้ข้อมูลในเครื่องไว้ก่อน และจะส่งขึ้นไปซ่อมคลาวด์ให้');
+                    setTimeout(() => this.cloudPush(), 1000);
                 }
                 this._cloudStatus = 'synced';
             } catch(e) {
@@ -273,6 +279,17 @@ const App = {
                 this._cloudStatus = 'offline';
             }
         }
+    },
+
+    // เช็คว่าข้อมูลก้อนนี้มีเนื้อหาจริงๆ ไหม (ไม่ใช่แค่โครงสร้างเปล่าๆ ที่มี key แต่ array ว่างหมด)
+    // ใช้กันไม่ให้ข้อมูลว่างเปล่าไปทับข้อมูลจริงโดยไม่ตั้งใจ (บั๊กที่เคยทำให้ข้อมูลหายไปแล้ว)
+    isMeaningfulData(d) {
+        if(!d) return false;
+        const hasProducts = Array.isArray(d.products) && d.products.length > 0;
+        const hasSales = Array.isArray(d.sales) && d.sales.length > 0;
+        const hasMembers = Array.isArray(d.members) && d.members.length > 0;
+        const hasAccounts = d.settings && Array.isArray(d.settings.accounts) && d.settings.accounts.length > 0;
+        return hasProducts || hasSales || hasMembers || hasAccounts;
     },
 
     // แยกออกมาจาก load() เพื่อให้เรียกซ้ำได้หลังดึงข้อมูลจาก cloud มาทับ (ต้องเช็ค structure ให้ครบเหมือนกันทุกครั้ง)
@@ -357,7 +374,7 @@ const App = {
         try {
             // ลองดึงข้อมูลจาก Sheets ก่อน ถ้ามีอยู่แล้วให้ใช้เป็นหลัก ถ้ายังว่างอยู่ให้ส่งข้อมูลปัจจุบันขึ้นไปตั้งต้น
             const cloudData = await this.cloudPull();
-            if(cloudData && Object.keys(cloudData).length > 0) {
+            if(this.isMeaningfulData(cloudData)) {
                 if(confirm("พบข้อมูลอยู่ใน Google Sheets นี้แล้ว ต้องการดึงข้อมูลนั้นมาใช้แทนข้อมูลในเครื่องตอนนี้หรือไม่?\n\n(กด ยกเลิก จะส่งข้อมูลในเครื่องตอนนี้ขึ้นไปทับแทน)")) {
                     this.db = cloudData;
                     this.ensureSchemaDefaults();
@@ -497,6 +514,113 @@ const App = {
         printArea.classList.add('hidden');
     },
 
+    // --- หน้าจัดการลูกค้าออนไลน์: ดูรายชื่อทั้งหมด ค้นหา แก้ไขประเภท ลบ ---
+    viewCustomers(root) {
+        const cfg = this.getCloudConfig();
+        if(!cfg || !cfg.enabled) {
+            root.innerHTML = `<div class="card" style="text-align:center; padding:30px 16px;">
+                <p style="font-size:13px; color:var(--ink-s);">ยังไม่ได้เชื่อมต่อ Google Sheets — ไปตั้งค่าที่หน้า 🔄 Sync ก่อน</p>
+            </div>`;
+            return;
+        }
+        root.innerHTML = `<div class="card" style="text-align:center;"><p style="font-size:13px; color:var(--ink-s);">⏳ กำลังโหลดรายชื่อลูกค้า...</p></div>`;
+        this.loadAndRenderCustomers(root);
+    },
+
+    async loadAndRenderCustomers(root) {
+        const cfg = this.getCloudConfig();
+        try {
+            const res = await fetch(cfg.url + '?action=getAllCustomers&token=' + encodeURIComponent(cfg.token));
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            this.state.allCustomers = json.customers || [];
+        } catch(e) {
+            root.innerHTML = `<div class="card" style="text-align:center;"><p style="font-size:13px; color:var(--err);">โหลดไม่สำเร็จ: ${e.message}</p></div>`;
+            return;
+        }
+        this.renderCustomerList(root);
+    },
+
+    renderCustomerList(root) {
+        root.innerHTML = `
+            <h3 style="margin:0 0 10px;">👥 จัดการลูกค้าออนไลน์ (${this.state.allCustomers.length})</h3>
+            <input class="input-main" id="cust_search_input" placeholder="🔍 ค้นหาชื่อ/เบอร์โทร..." value="${this.state.customerSearch || ''}" oninput="App.filterCustomerList(this.value)">
+            <div id="customer-list-items">${this.renderCustomerItems(this.getFilteredCustomers())}</div>
+        `;
+    },
+
+    getFilteredCustomers() {
+        const q = (this.state.customerSearch || '').trim().toLowerCase();
+        if(!q) return this.state.allCustomers;
+        return this.state.allCustomers.filter(c => (c.name||'').toLowerCase().includes(q) || (c.phone||'').includes(q));
+    },
+
+    renderCustomerItems(list) {
+        if(list.length === 0) return `<div class="card" style="text-align:center;"><p style="font-size:13px; color:var(--ink-s);">ไม่พบลูกค้า</p></div>`;
+        return list.map(c => {
+            const statusBadge = c.status === 'approved'
+                ? `<span style="font-size:11px; padding:2px 8px; border-radius:10px; background:#E8F3EA; color:var(--ok); font-weight:600;">อนุมัติแล้ว</span>`
+                : c.status === 'pending'
+                ? `<span style="font-size:11px; padding:2px 8px; border-radius:10px; background:#FCEEDC; color:#946015; font-weight:600;">รออนุมัติ</span>`
+                : `<span style="font-size:11px; padding:2px 8px; border-radius:10px; background:#FBEAE5; color:var(--err); font-weight:600;">ปฏิเสธแล้ว</span>`;
+            const tierBadge = c.status === 'approved'
+                ? `<span style="font-size:11px; padding:2px 8px; border-radius:10px; background:#E2E8E0; color:var(--pd); font-weight:600; margin-left:4px;">${c.tier === 'member' ? '🌟 สมาชิก' : '👤 ทั่วไป'}</span>`
+                : '';
+            return `
+                <div class="card">
+                    <b>${c.name}</b> ${statusBadge}${tierBadge}<br>
+                    <small class="mono">${c.phone}</small>
+                    <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                        ${c.status === 'pending' ? `
+                            <button class="btn btn-p" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px;" onclick="App.custAction('approve','${c.phone}','general')">✅ อนุมัติ (ทั่วไป)</button>
+                            <button class="btn btn-a" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px;" onclick="App.custAction('approve','${c.phone}','member')">🌟 อนุมัติ (สมาชิก)</button>
+                            <button class="btn btn-outline" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px; border-color:var(--err); color:var(--err);" onclick="App.custAction('reject','${c.phone}')">❌ ปฏิเสธ</button>
+                        ` : ''}
+                        ${c.status === 'approved' ? `
+                            <button class="btn btn-outline" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px;" onclick="App.custAction('tier','${c.phone}','${c.tier === 'member' ? 'general' : 'member'}')">🔄 สลับเป็น${c.tier === 'member' ? 'ทั่วไป' : 'สมาชิก'}</button>
+                        ` : ''}
+                        ${c.status === 'rejected' ? `
+                            <button class="btn btn-p" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px;" onclick="App.custAction('approve','${c.phone}','general')">✅ อนุมัติใหม่</button>
+                        ` : ''}
+                        <button class="btn btn-outline" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px; border-color:var(--err); color:var(--err);" onclick="App.custAction('delete','${c.phone}')">🗑️ ลบ</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    filterCustomerList(v) {
+        this.state.customerSearch = v;
+        const container = document.getElementById('customer-list-items');
+        if(container) container.innerHTML = this.renderCustomerItems(this.getFilteredCustomers());
+    },
+
+    async custAction(type, phone, tier) {
+        const cfg = this.getCloudConfig();
+        let action, body = { token: cfg.token, phone };
+        if(type === 'approve') { action = 'approveCustomer'; body.tier = tier; }
+        else if(type === 'reject') { action = 'rejectCustomer'; }
+        else if(type === 'tier') { action = 'updateCustomerTier'; body.tier = tier; }
+        else if(type === 'delete') {
+            if(!confirm('ลบข้อมูลลูกค้ารายนี้ถาวร? (จะสมัครใหม่ได้อีกครั้งถ้าต้องการ)')) return;
+            action = 'deleteCustomer';
+        }
+        try {
+            const res = await fetch(cfg.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, ...body })
+            });
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            const root = document.getElementById('view-port');
+            await this.loadAndRenderCustomers(root);
+            this.pollNotifications(); // อัปเดตเลขแจ้งเตือนด้วย เผื่อมีการอนุมัติ/ปฏิเสธจากหน้านี้
+        } catch(e) {
+            alert('❌ ไม่สำเร็จ: ' + e.message);
+        }
+    },
+
     bind() {
         const navBar = document.getElementById('nav-bar');
         if(navBar) {
@@ -553,6 +677,7 @@ const App = {
             if(this.state.view === 'dash') this.viewDash(root);
             else if(this.state.view === 'sell') this.viewSell(root);
             else if(this.state.view === 'notif') this.viewNotif(root);
+            else if(this.state.view === 'customers') this.viewCustomers(root);
             else if(this.state.view === 'history') this.viewHistory(root);
             else if(this.state.view === 'debt') this.viewDebt(root);
             else if(this.state.view === 'stock') this.viewStock(root);
