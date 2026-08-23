@@ -84,6 +84,11 @@ body.paper-a4 .receipt-box { font-size: 14px; padding: 16px; border: none; max-w
 .paper-size-option { display:flex; align-items:center; gap:10px; padding:12px; border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px; cursor:pointer; }
 .paper-size-option.active { border-color: var(--p); background: #F0F6F3; }
 .paper-size-option input { width:18px; height:18px; accent-color: var(--p); }
+
+/* ช่องรหัสผ่านพร้อมปุ่มรูปตา กดดูรหัสผ่านที่พิมพ์ได้ */
+.pwd-wrap { position:relative; margin-bottom:10px; }
+.pwd-wrap input { margin-bottom:0; padding-right:42px; }
+.pwd-wrap .eye-btn { position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:17px; padding:4px; line-height:1; }
 </style>
 </head>
 <body>
@@ -92,6 +97,10 @@ body.paper-a4 .receipt-box { font-size: 14px; padding: 16px; border: none; max-w
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <div id="app-title" style="font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:75%;">ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ</div>
         <div id="clock" class="mono" style="font-size:11px;">00:00:00</div>
+    </div>
+    <div id="user-info-bar" class="hidden" style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:6px; opacity:0.9;">
+        <span>👤 <b id="user-info-name"></b> <span id="user-info-role" class="mono" style="opacity:0.8;"></span></span>
+        <button onclick="App.logoutAccount()" style="background:none; border:none; color:inherit; text-decoration:underline; cursor:pointer; font-family:'Kanit',sans-serif; font-size:11px;">ออกจากระบบ</button>
     </div>
     <div class="nav-tabs" id="nav-bar">
         <button class="tab-btn active" data-v="dash">📊 หน้าแรก</button>
@@ -126,81 +135,116 @@ const App = {
         categories: ["ทั่วไป", "อาหารสด/แช่แข็ง", "น้ำมัน/ของใช้รถ"],
         settings: { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" }
     },
-    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', unlocked: false },
+    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null },
 
-    // --- IndexedDB storage layer (เก็บข้อมูลอิงพื้นที่ว่างจริงของเครื่อง แทน localStorage ที่มีโควต้าจำกัดแค่ 5-10MB) ---
-    IDB_NAME: 'sanpos_v15_idb',
-    IDB_STORE: 'kv',
-    LS_KEY: 'sanpos_v15_db',
-
-    _openIDB() {
-        return new Promise((resolve, reject) => {
-            if(!window.indexedDB) { reject(new Error('IndexedDB not supported')); return; }
-            const req = indexedDB.open(this.IDB_NAME, 1);
-            req.onupgradeneeded = (e) => {
-                const idb = e.target.result;
-                if(!idb.objectStoreNames.contains(this.IDB_STORE)) {
-                    idb.createObjectStore(this.IDB_STORE);
-                }
-            };
-            req.onsuccess = (e) => resolve(e.target.result);
-            req.onerror = (e) => reject(e.target.error);
+    init() {
+        this.loadingScreen(true);
+        this.load().then(() => {
+            this.bind();
+            this.render();
+            this.loadingScreen(false);
+        }).catch(e => {
+            console.error("Load failed:", e);
+            this.loadingScreen(false);
+            alert("⚠️ โหลดข้อมูลไม่สำเร็จ: " + e.message);
         });
-    },
-    async _idbGet(key) {
-        const idb = await this._openIDB();
-        return new Promise((resolve, reject) => {
-            const tx = idb.transaction(this.IDB_STORE, 'readonly');
-            const req = tx.objectStore(this.IDB_STORE).get(key);
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
-    },
-    async _idbSet(key, value) {
-        const idb = await this._openIDB();
-        return new Promise((resolve, reject) => {
-            const tx = idb.transaction(this.IDB_STORE, 'readwrite');
-            const req = tx.objectStore(this.IDB_STORE).put(value, key);
-            req.onsuccess = () => resolve(true);
-            req.onerror = () => reject(req.error);
-        });
-    },
-
-    async init() {
-        await this.load();
-        this.bind();
-        this.render();
         setInterval(() => {
             const clockEl = document.getElementById('clock');
             if(clockEl) clockEl.innerText = new Date().toLocaleTimeString('th-TH');
         }, 1000);
     },
 
+    loadingScreen(show) {
+        let el = document.getElementById('loading-overlay');
+        if(show) {
+            if(!el) {
+                el = document.createElement('div');
+                el.id = 'loading-overlay';
+                el.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:Kanit,sans-serif;color:var(--p);font-size:15px;';
+                el.innerHTML = '⏳ กำลังโหลดข้อมูล...';
+                document.body.appendChild(el);
+            }
+        } else if(el) {
+            el.remove();
+        }
+    },
+
+    // --- IndexedDB (เก็บข้อมูลอิงพื้นที่ว่างจริงของเครื่อง แทน localStorage ที่จำกัดแค่ ~5-10MB) ---
+    _idbPromise: null,
+    idbOpen() {
+        if(this._idbPromise) return this._idbPromise;
+        this._idbPromise = new Promise((resolve, reject) => {
+            if(!window.indexedDB) { reject(new Error("เบราว์เซอร์นี้ไม่รองรับ IndexedDB")); return; }
+            const req = indexedDB.open('sanpos_idb', 1);
+            req.onupgradeneeded = (e) => {
+                const idb = e.target.result;
+                if(!idb.objectStoreNames.contains('kv')) idb.createObjectStore('kv');
+            };
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+        return this._idbPromise;
+    },
+    async idbGet(key) {
+        const idb = await this.idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = idb.transaction('kv', 'readonly');
+            const req = tx.objectStore('kv').get(key);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    },
+    async idbSet(key, value) {
+        const idb = await this.idbOpen();
+        return new Promise((resolve, reject) => {
+            const tx = idb.transaction('kv', 'readwrite');
+            const req = tx.objectStore('kv').put(value, key);
+            req.onsuccess = () => resolve();
+            req.onerror = () => reject(req.error);
+        });
+    },
+
     async load() {
         try {
-            let d = await this._idbGet(this.LS_KEY);
+            let d = await this.idbGet('sanpos_v15_db');
             if(!d) {
-                // ยังไม่เคยมีข้อมูลใน IndexedDB -> ลองย้ายข้อมูลเก่าจาก localStorage มาให้อัตโนมัติ (ครั้งเดียว)
-                const old = localStorage.getItem(this.LS_KEY);
+                // ยังไม่มีข้อมูลใน IndexedDB - ลองย้ายข้อมูลเก่าจาก localStorage มาให้อัตโนมัติ (ทำครั้งเดียว)
+                const old = localStorage.getItem('sanpos_v15_db');
                 if(old) {
                     d = JSON.parse(old);
-                    await this._idbSet(this.LS_KEY, d);
-                    localStorage.removeItem(this.LS_KEY);
+                    await this.idbSet('sanpos_v15_db', d);
+                    localStorage.removeItem('sanpos_v15_db');
+                    console.log('ย้ายข้อมูลจาก localStorage ไป IndexedDB เรียบร้อยแล้ว');
                 }
             }
-            if(d) this.db = d;
+            this.db = d || {};
         } catch(e) {
-            console.error("IndexedDB load error, falling back to localStorage:", e);
+            console.error("Local database error, resetting structure:", e);
+            this.db = {};
+        }
+        this.ensureSchemaDefaults();
+
+        // ลองดึงข้อมูลล่าสุดจาก Google Sheets ก่อน (ถ้าตั้งค่าซิงค์ออนไลน์ไว้และมีเน็ต) ใช้แทนข้อมูลในเครื่องถ้าดึงสำเร็จ
+        const cfg = this.getCloudConfig();
+        this._cloudStatus = (cfg && cfg.enabled) ? 'checking' : 'off';
+        if(cfg && cfg.enabled && cfg.url && cfg.token) {
             try {
-                const d = localStorage.getItem(this.LS_KEY);
-                if(d) this.db = JSON.parse(d);
-            } catch(e2) {
-                console.error("Local database error, resetting structure:", e2);
-                this.db = {};
+                const cloudData = await this.cloudPull();
+                if(cloudData && Object.keys(cloudData).length > 0) {
+                    this.db = cloudData;
+                    this.ensureSchemaDefaults();
+                    await this.idbSet('sanpos_v15_db', this.db); // เก็บสำรองไว้ในเครื่องด้วย เผื่อเน็ตหลุดครั้งหน้า
+                }
+                this._cloudStatus = 'synced';
+            } catch(e) {
+                console.warn('ดึงข้อมูลจาก Google Sheets ไม่สำเร็จ ใช้ข้อมูลในเครื่องแทน:', e.message);
+                this._cloudStatus = 'offline';
             }
         }
+    },
 
-        // Defensive checks to ensure structural integrity
+    // แยกออกมาจาก load() เพื่อให้เรียกซ้ำได้หลังดึงข้อมูลจาก cloud มาทับ (ต้องเช็ค structure ให้ครบเหมือนกันทุกครั้ง)
+    ensureSchemaDefaults() {
         if(!this.db) this.db = {};
         if(!Array.isArray(this.db.products)) this.db.products = [];
         if(!Array.isArray(this.db.sales)) this.db.sales = [];
@@ -212,19 +256,101 @@ const App = {
             this.db.settings = { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" };
         }
         if(!this.db.settings.paperSize) this.db.settings.paperSize = '80mm';
+        if(!Array.isArray(this.db.settings.accounts)) this.db.settings.accounts = [];
+        // migrate เดิม: บัญชีที่สร้างไว้ก่อนมีระบบ role ให้ตัวแรกเป็น admin ที่เหลือเป็น user
+        this.db.settings.accounts.forEach((a, i) => { if(!a.role) a.role = (i === 0 ? 'admin' : 'user'); });
+        // ไม่ seed บัญชี Admin ตายตัวอีกต่อไป — ถ้ายังไม่มีบัญชีเลย หน้า login จะให้ผู้ใช้ตั้งบัญชี Admin คนแรกด้วยตัวเอง
     },
 
-    async save() {
+    save() {
+        // คืนค่า Promise ไว้ด้วย เผื่อจุดที่ต้องรอบันทึกเสร็จก่อนแล้วค่อยรีเฟรชหน้า (กันข้อมูลหายเพราะรีเฟรชเร็วกว่าบันทึกเสร็จ)
+        const p = this.idbSet('sanpos_v15_db', this.db).catch(e => {
+            console.error('save failed', e);
+            alert("⚠️ บันทึกข้อมูลไม่สำเร็จ: " + e.message);
+        });
+        // ส่งขึ้น Google Sheets แบบไม่รอผล (ถ้าตั้งค่าซิงค์ไว้) ไม่ให้กระทบความเร็วการใช้งาน แต่ยังดักจับ error ไว้เพื่ออัปเดตสถานะให้เห็น
+        this.cloudPush().catch(e => {
+            console.error('ส่งข้อมูลขึ้น Google Sheets ไม่สำเร็จ:', e.message);
+            this._cloudStatus = 'offline';
+        });
+        return p;
+    },
+
+    // --- ซิงค์ข้อมูลออนไลน์กับ Google Sheets (ผ่าน Apps Script Web App) ---
+    // ตั้งค่าการเชื่อมต่อ (URL/รหัสลับ) เก็บไว้ที่ localStorage ของเครื่องนี้เท่านั้น ไม่ปนกับข้อมูลร้านที่ซิงค์ไปมา
+    getCloudConfig() {
+        try { return JSON.parse(localStorage.getItem('sanpos_cloud_config') || 'null'); } catch(e) { return null; }
+    },
+    saveCloudConfig(cfg) {
+        localStorage.setItem('sanpos_cloud_config', JSON.stringify(cfg));
+    },
+    async cloudPull() {
+        const cfg = this.getCloudConfig();
+        if(!cfg || !cfg.url || !cfg.token) return null;
+        const res = await fetch(cfg.url + '?token=' + encodeURIComponent(cfg.token));
+        const json = await res.json();
+        if(json.error) throw new Error(json.error);
+        return json.data;
+    },
+    // หมายเหตุ: ไม่ดักจับ error ในนี้ ปล่อยให้ผู้เรียกใช้ (save()/connectCloud()) เป็นคนจัดการ
+    // เพื่อให้ตอนกด "เชื่อมต่อ" เห็น error จริงถ้าส่งไม่สำเร็จ แทนที่จะขึ้นว่าสำเร็จทั้งที่ไม่ได้ส่งจริง
+    async cloudPush() {
+        const cfg = this.getCloudConfig();
+        if(!cfg || !cfg.url || !cfg.token || !cfg.enabled) return;
+        const res = await fetch(cfg.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // กัน CORS preflight ของ Apps Script
+            body: JSON.stringify({ token: cfg.token, data: this.db })
+        });
+        const json = await res.json();
+        if(json.error) throw new Error(json.error);
+        this._cloudStatus = 'synced';
+    },
+
+    renderCloudStatus() {
+        const cfg = this.getCloudConfig();
+        if(!cfg || !cfg.enabled) return `<div style="font-size:12px; padding:8px 10px; border-radius:10px; background:#F0F0F0; color:var(--ink-s);">⚪ ยังไม่ได้เชื่อมต่อ</div>`;
+        if(this._cloudStatus === 'synced') return `<div style="font-size:12px; padding:8px 10px; border-radius:10px; background:#E8F3EA; color:var(--ok);">🟢 เชื่อมต่อแล้ว ซิงค์ล่าสุดสำเร็จ</div>`;
+        if(this._cloudStatus === 'offline') return `<div style="font-size:12px; padding:8px 10px; border-radius:10px; background:#FBEAE5; color:var(--err);">🔴 ซิงค์ไม่สำเร็จ (เช็คเน็ต/URL/รหัสลับ) — แอปยังใช้งานได้ปกติด้วยข้อมูลในเครื่อง</div>`;
+        return `<div style="font-size:12px; padding:8px 10px; border-radius:10px; background:#FCEEDC; color:#946015;">🟡 กำลังตรวจสอบการเชื่อมต่อ...</div>`;
+    },
+
+    async connectCloud() {
+        const url = (document.getElementById('cloud_url').value || '').trim();
+        const token = document.getElementById('cloud_token').value || '';
+        if(!url || !token) { alert("กรุณากรอก Web app URL และรหัสลับให้ครบ"); return; }
+        this.saveCloudConfig({ url, token, enabled: true });
+        this._cloudStatus = 'checking';
+        this.render();
         try {
-            await this._idbSet(this.LS_KEY, this.db);
-        } catch(e) {
-            console.error("IndexedDB save error:", e);
-            try {
-                localStorage.setItem(this.LS_KEY, JSON.stringify(this.db));
-            } catch(e2) {
-                alert("⚠️ ไม่สามารถบันทึกข้อมูลได้ กรุณาลองปิดแล้วเปิดเบราว์เซอร์ใหม่ หรือตรวจสอบพื้นที่ว่างในเครื่อง");
+            // ลองดึงข้อมูลจาก Sheets ก่อน ถ้ามีอยู่แล้วให้ใช้เป็นหลัก ถ้ายังว่างอยู่ให้ส่งข้อมูลปัจจุบันขึ้นไปตั้งต้น
+            const cloudData = await this.cloudPull();
+            if(cloudData && Object.keys(cloudData).length > 0) {
+                if(confirm("พบข้อมูลอยู่ใน Google Sheets นี้แล้ว ต้องการดึงข้อมูลนั้นมาใช้แทนข้อมูลในเครื่องตอนนี้หรือไม่?\n\n(กด ยกเลิก จะส่งข้อมูลในเครื่องตอนนี้ขึ้นไปทับแทน)")) {
+                    this.db = cloudData;
+                    this.ensureSchemaDefaults();
+                    await this.idbSet('sanpos_v15_db', this.db);
+                } else {
+                    await this.cloudPush();
+                }
+            } else {
+                await this.cloudPush();
             }
+            this._cloudStatus = 'synced';
+            alert("✅ เชื่อมต่อ Google Sheets สำเร็จแล้ว");
+        } catch(e) {
+            this._cloudStatus = 'offline';
+            alert("⚠️ เชื่อมต่อไม่สำเร็จ: " + e.message + "\nกรุณาตรวจสอบ URL และรหัสลับอีกครั้ง");
         }
+        this.render();
+    },
+
+    disconnectCloud() {
+        if(!confirm("ยกเลิกการซิงค์กับ Google Sheets? ข้อมูลในเครื่องจะยังอยู่ครบ แค่จะไม่อัปเดตขึ้นออนไลน์อีก")) return;
+        const cfg = this.getCloudConfig() || {};
+        this.saveCloudConfig({ ...cfg, enabled: false });
+        this._cloudStatus = 'off';
+        this.render();
     },
 
     bind() {
@@ -250,7 +376,27 @@ const App = {
             if(!root) return;
             root.innerHTML = "";
 
+            const navBar = document.getElementById('nav-bar');
             const cartBar = document.getElementById('cart-bar');
+            const userInfoBar = document.getElementById('user-info-bar');
+
+            // --- ประตูล็อกอิน: ต้องเข้าสู่ระบบก่อนถึงจะเห็นเมนู/หน้าใดๆ ของแอป ---
+            if(!this.state.authedUser || !this.getAccount(this.state.authedUser)) {
+                this.state.authedUser = null;
+                if(navBar) navBar.classList.add('hidden');
+                if(cartBar) cartBar.classList.add('hidden');
+                if(userInfoBar) userInfoBar.classList.add('hidden');
+                this.renderLoginGate(root);
+                return;
+            }
+            if(navBar) navBar.classList.remove('hidden');
+            if(userInfoBar) {
+                userInfoBar.classList.remove('hidden');
+                const acc = this.getAccount(this.state.authedUser);
+                document.getElementById('user-info-name').textContent = this.state.authedUser;
+                document.getElementById('user-info-role').textContent = this.isAdminRole(acc.role) ? '(Admin)' : '(User)';
+            }
+
             if(cartBar) {
                 cartBar.classList.toggle('hidden', this.state.view !== 'sell');
             }
@@ -271,6 +417,95 @@ const App = {
             console.error("Render error:", err);
             alert("❌ เกิดข้อผิดพลาดในการโหลดหน้าจอ: " + err.message);
         }
+    },
+
+    // --- หน้าล็อกอิน (เต็มหน้าจอ ต้องผ่านก่อนถึงจะเห็นเมนูใดๆ) ---
+    renderLoginGate(root) {
+        const accounts = this.db.settings.accounts || [];
+
+        // ยังไม่มีบัญชีในระบบเลย -> ให้ผู้ใช้ตั้งค่าบัญชี Admin คนแรกด้วยตัวเอง (ไม่ seed รหัสตายตัวอีกต่อไป)
+        if(accounts.length === 0) {
+            root.innerHTML = `
+                <div class="card" style="margin-top:30px;">
+                    <div style="text-align:center; margin-bottom:16px;">
+                        <div style="font-size:36px;">🔐</div>
+                        <h3 style="margin:8px 0 2px;">${this.db.settings.storeName}</h3>
+                        <p style="font-size:12px; color:var(--ink-s); margin:0;">ยังไม่มีบัญชีในระบบ กรุณาตั้งค่าบัญชีผู้ดูแลระบบ (Admin) คนแรกด้วยตัวคุณเอง</p>
+                    </div>
+                    <input type="text" id="gate_first_name" class="input-main" placeholder="ตั้งชื่อผู้ใช้ Admin">
+                    <div class="pwd-wrap">
+                        <input type="password" id="gate_first_pass" class="input-main" placeholder="ตั้งรหัสผ่าน Admin" onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.setupFirstAdmin(); }">
+                        <button type="button" class="eye-btn" onclick="App.togglePwd('gate_first_pass', this)">👁️</button>
+                    </div>
+                    <button class="btn btn-p" onclick="App.setupFirstAdmin()">✅ สร้างบัญชี Admin และเข้าใช้งาน</button>
+                    <p style="font-size:11px; color:var(--ink-s); margin-top:10px; margin-bottom:0;">บัญชีอื่นๆ ในภายหลัง ต้องให้ Admin เป็นคนเพิ่มให้เท่านั้น จากหน้าตั้งค่า (User ทั่วไปสร้างบัญชีเองไม่ได้)</p>
+                </div>
+            `;
+            return;
+        }
+
+        // มีบัญชีอยู่แล้ว -> แสดงแค่ฟอร์ม login (ตัดการสร้างบัญชีเองออก ต้องให้ Admin เพิ่มให้เท่านั้น)
+        root.innerHTML = `
+            <div class="card" style="margin-top:30px;">
+                <div style="text-align:center; margin-bottom:16px;">
+                    <div style="font-size:36px;">🔐</div>
+                    <h3 style="margin:8px 0 2px;">${this.db.settings.storeName}</h3>
+                    <p style="font-size:12px; color:var(--ink-s); margin:0;">กรุณาเข้าสู่ระบบก่อนใช้งาน</p>
+                </div>
+                <select id="gate_login_name" class="input-main">
+                    ${accounts.map(a=>`<option value="${a.name}">${a.name}${this.isAdminRole(a.role) ? ' (Admin)' : ''}</option>`).join('')}
+                </select>
+                <div class="pwd-wrap">
+                    <input type="password" id="gate_login_pass" class="input-main" placeholder="รหัสผ่าน" onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.gateLogin(); }">
+                    <button type="button" class="eye-btn" onclick="App.togglePwd('gate_login_pass', this)">👁️</button>
+                </div>
+                <div id="gate_login_err" class="hidden" style="color:var(--err); font-size:12px; margin-bottom:8px;">❌ ชื่อบัญชีหรือรหัสผ่านไม่ถูกต้อง</div>
+                <button class="btn btn-p" onclick="App.gateLogin()">🔓 เข้าสู่ระบบ</button>
+                <p style="font-size:11px; color:var(--ink-s); margin-top:10px; margin-bottom:0;">ยังไม่มีบัญชี? ให้ผู้ดูแลระบบ (Admin) เพิ่มบัญชีให้จากหน้าตั้งค่า</p>
+            </div>
+        `;
+    },
+
+    setupFirstAdmin() {
+        const name = (document.getElementById('gate_first_name').value || '').trim();
+        const pass = document.getElementById('gate_first_pass').value || '';
+        if(!name || !pass) { alert("กรุณากรอกชื่อและรหัสผ่านให้ครบ"); return; }
+        this.db.settings.accounts = [{ name, password: pass, role: 'admin' }];
+        this.save();
+        this.state.authedUser = name;
+        this.render();
+    },
+
+    gateLogin() {
+        const name = document.getElementById('gate_login_name').value;
+        const pass = document.getElementById('gate_login_pass').value || '';
+        const acc = this.getAccount(name);
+        const errEl = document.getElementById('gate_login_err');
+        if(!acc || acc.password !== pass) { errEl.classList.remove('hidden'); return; }
+        errEl.classList.add('hidden');
+        this.state.authedUser = name;
+        this.render();
+    },
+
+    // --- Helper: ดึงข้อมูลบัญชีจากชื่อ / เช็คว่าเป็น Admin หรือไม่ ---
+    getAccount(name) {
+        // เทียบชื่อบัญชีแบบไม่สนตัวพิมพ์เล็ก-ใหญ่ และตัดเว้นวรรคหน้า-หลังออกก่อนเทียบ (กันปัญหาบัญชีซ้ำ/login ไม่ผ่าน)
+        return (this.db.settings.accounts || []).find(a => (a.name||'').trim().toLowerCase() === (name||'').trim().toLowerCase());
+    },
+    isAdminRole(role) {
+        return (role || '').trim().toLowerCase() === 'admin';
+    },
+    isAdmin() {
+        if(this._adminOverrideActive) return true; // ยืนยันสิทธิ์ Admin ชั่วคราวระหว่างทำ action นี้อยู่
+        const acc = this.getAccount(this.state.authedUser);
+        return !!(acc && this.isAdminRole(acc.role));
+    },
+    // กดไอคอนรูปตาเพื่อสลับดู/ซ่อนรหัสผ่านที่พิมพ์อยู่ในช่องนั้นๆ
+    togglePwd(id, btn) {
+        const el = document.getElementById(id);
+        if(!el) return;
+        if(el.type === 'password') { el.type = 'text'; btn.textContent = '🙈'; }
+        else { el.type = 'password'; btn.textContent = '👁️'; }
     },
 
     // --- DASHBOARD ---
@@ -444,7 +679,6 @@ const App = {
             const isLow = p.stock <= 5;
             return `
                 <div class="p-card" onclick="App.selectPrice('${p.id}')">
-                    <button onclick="event.stopPropagation(); App.openQuickEdit('${p.id}')" title="แก้ไขราคา/สต๊อกด่วน" style="position:absolute; top:6px; left:6px; width:24px; height:24px; border:none; border-radius:8px; background:rgba(255,255,255,0.92); box-shadow:0 1px 4px rgba(0,0,0,0.2); font-size:12px; cursor:pointer; z-index:2; display:flex; align-items:center; justify-content:center;">✏️</button>
                     <div class="p-tag ${isLow?'low-stock':''}">${isLow?'เหลือน้อย: ':''}${p.stock}</div>
                     <img src="${p.img || 'https://via.placeholder.com/100?text=No+Image'}">
                     <div style="font-size:12px;font-weight:600;height:32px;overflow:hidden;margin-top:4px;">${p.name}</div>
@@ -512,7 +746,9 @@ const App = {
             <div style="max-height:200px; overflow-y:auto; margin-bottom:15px;">
                 ${this.state.cart.map((i,idx)=>`
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;font-size:13px">
-                        <span>${i.name}</span>
+                        <span>${i.name}
+                            <button onclick="App.openQuickEdit('${i.id}', true)" style="border:none;background:none;cursor:pointer;font-size:13px;color:var(--p);" title="แก้ไขราคา/สต๊อก">✏️</button>
+                        </span>
                         <span>฿${i.price*i.qty} 
                             <button onclick="App.editQ(${idx},-1)" style="padding:2px 8px; border-radius:6px; border:1px solid #ccc;">-</button> 
                             <b>${i.qty}</b> 
@@ -1034,15 +1270,15 @@ const App = {
         if(list) list.innerHTML = this.renderStockListItems();
     },
 
-    // --- แก้ไขราคา/สต๊อกแบบเร็ว (popup) ---
-    openQuickEdit(id) {
-        this.checkAuth(() => this._openQuickEdit(id));
-    },
-    _openQuickEdit(id) {
+    // --- แก้ไขราคา/สต๊อกแบบเร็ว (popup) — ใช้ได้ทั้งจากหน้าสต๊อก และจากตะกร้าในหน้าขายสินค้า (fromCart=true) ---
+    openQuickEdit(id, fromCart) {
+        if(!this.isAdmin()) { this.requireAdmin(() => this.openQuickEdit(id, fromCart)); return; }
         const p = this.db.products.find(x => x.id === id);
         if(!p) { alert("⚠️ ไม่พบข้อมูลสินค้านี้ (id: " + id + ") กรุณาลองรีเฟรชหน้าเว็บแล้วลองใหม่"); return; }
+        this._quickEditFromCart = !!fromCart;
         this.openM(`
             <h3 style="margin-top:0">✏️ แก้ไขด่วน: ${p.name}</h3>
+            ${fromCart ? '<p style="font-size:11px; color:var(--ink-s); margin-top:-6px;">แก้ไขแล้วราคาสินค้านี้ในตะกร้าจะอัปเดตให้อัตโนมัติ</p>' : ''}
             <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">หมวดหมู่</label>
             <select id="qe_cat" class="input-main">
                 ${this.db.categories.map(c=>`<option value="${c}" ${((p.category||'ทั่วไป')===c)?'selected':''}>${c}</option>`).join('')}
@@ -1066,8 +1302,9 @@ const App = {
                 </div>
             </div>
             <button class="btn btn-p" style="width:100%; margin-top:14px;" onclick="App.saveQuickEdit('${p.id}')">💾 บันทึก</button>
-            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.closeM(); App.editP('${p.id}')">แก้ไขข้อมูลอื่น (ชื่อ/รูป/บาร์โค้ด) →</button>
-            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.closeM()">ยกเลิก</button>
+            ${fromCart ? `<button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.modalCart()">ยกเลิก (กลับไปตะกร้า)</button>`
+                       : `<button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.closeM(); App.editP('${p.id}')">แก้ไขข้อมูลอื่น (ชื่อ/รูป/บาร์โค้ด) →</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.closeM()">ยกเลิก</button>`}
         `);
     },
 
@@ -1081,13 +1318,20 @@ const App = {
         const pw1 = parseFloat(document.getElementById('qe_pw1').value) || 0;
         this.db.products[idx] = { ...this.db.products[idx], category: cat, cost, stock, pr1, pw1 };
         this.save();
-        this.closeM();
-        this.render();
+        if(this._quickEditFromCart) {
+            this._quickEditFromCart = false;
+            this.recalcCartPrices();
+            this.modalCart();
+        } else {
+            this.closeM();
+            this.render();
+        }
         alert("✅ อัปเดตราคา/สต๊อกเรียบร้อยแล้ว");
     },
 
     // --- แก้ไขชื่อหมวดหมู่เดิม (เปลี่ยนชื่อในสินค้าทุกตัวที่อยู่หมวดนั้นด้วย) ---
     startRenameCategory(idx) {
+        if(!this.isAdmin()) { this.requireAdmin(() => this.startRenameCategory(idx)); return; }
         const chip = document.querySelectorAll('#cat-chip-list .cat-chip')[idx];
         if(!chip) return;
         const textEl = chip.querySelector('.cat-chip-text');
@@ -1313,9 +1557,7 @@ const App = {
 
     // โหลดข้อมูลเข้าฟอร์มเมื่อกดแก้ไข
     editP(id) {
-        this.checkAuth(() => this._editP(id));
-    },
-    _editP(id) {
+        if(!this.isAdmin()) { this.requireAdmin(() => this.editP(id)); return; }
         const p = this.db.products.find(x => x.id === id);
         if(!p) return;
         this.state.editingProductId = id;
@@ -1376,6 +1618,7 @@ const App = {
     },
 
     addCategoryFromInput() {
+        if(!this.isAdmin()) { this.requireAdmin(() => this.addCategoryFromInput()); return; }
         const input = document.getElementById('new_cat_input');
         if(input && input.value.trim()) {
             const catName = input.value.trim();
@@ -1391,6 +1634,7 @@ const App = {
     },
 
     deleteCategory(idx) {
+        if(!this.isAdmin()) { this.requireAdmin(() => this.deleteCategory(idx)); return; }
         const catName = this.db.categories[idx];
         if(!confirm(`ต้องการลบหมวดหมู่ "${catName}" หรือไม่?`)) return;
         this.db.categories.splice(idx, 1);
@@ -1505,9 +1749,7 @@ const App = {
     },
 
     deleteP(id) {
-        this.checkAuth(() => this._deleteP(id));
-    },
-    _deleteP(id) {
+        if(!this.isAdmin()) { this.requireAdmin(() => this.deleteP(id)); return; }
         if(!confirm("ยืนยันลบสินค้านี้ออกจากระบบ?")) return;
         this.db.products = this.db.products.filter(x => x.id !== id);
         this.save(); this.render();
@@ -1567,31 +1809,56 @@ const App = {
                     <div><b style="font-size:13px;">A4</b><br><small style="color:var(--ink-s);">กระดาษทั่วไป / เครื่องพิมพ์อิงค์เจ็ท-เลเซอร์</small></div>
                 </label>
             </div>
-            <div class="card">
-                <h3 style="margin-top:0">🔒 รหัสผ่านแก้ไขสินค้า</h3>
-                <p style="font-size:12px; color:var(--ink-s); margin-top:0;">
-                    ${this.db.settings.editPassword
-                        ? 'เปิดใช้งานอยู่ — ต้องใส่รหัสผ่านก่อนถึงจะแก้ไข/ลบสินค้าได้ (ใส่ครั้งเดียวต่อการเปิดแอปหนึ่งครั้ง)'
-                        : 'ยังไม่ได้ตั้งรหัสผ่าน — ตอนนี้ใครก็แก้ไข/ลบสินค้าได้ทันที'}
-                </p>
-                <label style="font-size:12px; color:var(--ink-s);">${this.db.settings.editPassword ? 'ตั้งรหัสผ่านใหม่' : 'ตั้งรหัสผ่าน'}</label>
-                <input type="password" id="edit_pw" class="input-main" placeholder="รหัสผ่านใหม่">
-                <label style="font-size:12px; color:var(--ink-s);">ยืนยันรหัสผ่านอีกครั้ง</label>
-                <input type="password" id="edit_pw2" class="input-main" placeholder="พิมพ์รหัสผ่านซ้ำ">
-                <button class="btn btn-p" onclick="App.saveEditPassword()">บันทึกรหัสผ่าน</button>
-                ${this.db.settings.editPassword ? `<button class="btn btn-outline" style="margin-top:8px;" onclick="App.removeEditPassword()">ปิดใช้งานรหัสผ่าน</button>` : ''}
-            </div>
             <div class="card"><h3>📤 สำรองข้อมูล (Backup)</h3><button class="btn btn-s" onclick="App.exportJ()">ดาวน์โหลดไฟล์สำรองข้อมูล (.json)</button></div>
             <div class="card"><h3>📥 นำเข้าข้อมูล (Import)</h3><input type="file" class="input-main" onchange="App.importJ(event)"></div>
+            ${this.isAdmin() ? `
+            <div class="card">
+                <h3 style="margin-top:0">🌐 ซิงค์ข้อมูลออนไลน์ (Google Sheets)</h3>
+                <p style="font-size:12px; color:var(--ink-s); margin-top:0;">เชื่อมกับ Google Sheets ของคุณ ข้อมูลจะอัปเดตขึ้นออนไลน์ทุกครั้งที่บันทึก ไม่ต้องโอนไฟล์ backup ทีละเครื่องอีกต่อไป</p>
+                ${this.renderCloudStatus()}
+                <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px; margin-top:10px;">Web app URL (จาก Apps Script Deploy)</label>
+                <input type="text" id="cloud_url" class="input-main" placeholder="https://script.google.com/macros/s/xxxxx/exec" value="${(this.getCloudConfig()||{}).url || ''}">
+                <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">รหัสลับ (SECRET_TOKEN ที่ตั้งไว้ในโค้ด Apps Script)</label>
+                <div class="pwd-wrap">
+                    <input type="password" id="cloud_token" class="input-main" placeholder="รหัสลับ" value="${(this.getCloudConfig()||{}).token || ''}">
+                    <button type="button" class="eye-btn" onclick="App.togglePwd('cloud_token', this)">👁️</button>
+                </div>
+                <button class="btn btn-p" onclick="App.connectCloud()">🔗 เชื่อมต่อและซิงค์เดี๋ยวนี้</button>
+                ${(this.getCloudConfig()||{}).enabled ? `<button class="btn btn-outline" style="border-color:var(--err); color:var(--err);" onclick="App.disconnectCloud()">ยกเลิกการซิงค์</button>` : ''}
+            </div>
+            ` : ''}
+            ${this.isAdmin() ? `
+            <div class="card">
+                <h3 style="margin-top:0">👤 จัดการบัญชีผู้ใช้ (เฉพาะ Admin)</h3>
+                <p style="font-size:12px; color:var(--ink-s); margin-top:0;">Admin จัดการได้ทั้งเพิ่ม/ลบบัญชี และกำหนดสิทธิ์ Admin หรือ User</p>
+                ${(this.db.settings.accounts||[]).map(a => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
+                        <span>${a.name} <span style="font-size:11px; padding:2px 8px; border-radius:10px; font-weight:600; ${this.isAdminRole(a.role) ? 'background:#FCEEDC;color:#946015;' : 'background:#E2E8E0;color:var(--pd);'}">${this.isAdminRole(a.role)?'Admin':'User'}</span></span>
+                        <button onclick="App.deleteAccount('${a.name}')" style="border:none; background:none; color:var(--err); cursor:pointer; font-size:13px;">ลบ</button>
+                    </div>
+                `).join('')}
+                <input type="text" id="new_acc_name" class="input-main" style="margin-top:10px;" placeholder="ชื่อบัญชีใหม่">
+                <div class="pwd-wrap">
+                    <input type="password" id="new_acc_pass" class="input-main" placeholder="รหัสผ่าน">
+                    <button type="button" class="eye-btn" onclick="App.togglePwd('new_acc_pass', this)">👁️</button>
+                </div>
+                <select id="new_acc_role" class="input-main">
+                    <option value="user">User (พนักงานทั่วไป)</option>
+                    <option value="admin">Admin (ผู้ดูแลระบบ)</option>
+                </select>
+                <button class="btn btn-p" onclick="App.addAccount()">+ เพิ่มบัญชี</button>
+            </div>
+            ` : ''}
         `;
     },
-    async saveSettings() {
+    saveSettings() {
         const sInput = document.getElementById('sname');
         if(sInput) {
             this.db.settings.storeName = sInput.value;
-            await this.save();
-            alert("✅ บันทึกชื่อร้านค้าเรียบร้อยแล้ว");
-            location.reload();
+            this.save().then(() => {
+                alert("✅ บันทึกชื่อร้านค้าเรียบร้อยแล้ว");
+                location.reload();
+            });
         }
     },
 
@@ -1608,63 +1875,91 @@ const App = {
     importJ(e) {
         const f = e.target.files[0]; if(!f) return;
         const r = new FileReader();
-        r.onload = async ev => {
+        r.onload = ev => {
             try {
-                const parsed = JSON.parse(ev.target.result);
-                this.db = parsed;
-                await this.save();
-                alert("✅ นำเข้าข้อมูลเรียบร้อยแล้ว");
-                location.reload();
+                this.db = JSON.parse(ev.target.result);
+                this.save().then(() => {
+                    alert("✅ นำเข้าข้อมูลเรียบร้อยแล้ว");
+                    location.reload();
+                });
             } catch(err) {
-                console.error("Import error:", err);
                 alert("❌ ไฟล์ไม่ถูกต้อง กรุณาเลือกไฟล์ .json ของระบบ SanPOS");
             }
         }; 
         r.readAsText(f);
     },
 
-    // --- ระบบรหัสผ่านป้องกันการแก้ไขสินค้า ---
-    checkAuth(cb) {
-        if(!this.db.settings.editPassword) { cb(); return; } // ยังไม่ได้ตั้งรหัสผ่าน -> แก้ไขได้เลย
-        if(this.state.unlocked) { cb(); return; } // ปลดล็อกแล้วในเซสชันนี้
-        this.pendingAuthCb = cb;
+    // --- ระบบสิทธิ์ Admin / User ---
+    // เรียก requireAdmin(fn) ก่อนทำ action ที่ต้องมีสิทธิ์ Admin เท่านั้น
+    // ถ้า login อยู่แล้วและเป็น Admin จะรัน fn ทันที ถ้าเป็น User ต้องให้ Admin ยืนยันตัวตนก่อน
+    requireAdmin(fn) {
+        if(this.isAdmin()) { fn(); return; }
+        this.openAdminOverrideModal(fn);
+    },
+
+    openAdminOverrideModal(onSuccess) {
+        const admins = (this.db.settings.accounts || []).filter(a => this.isAdminRole(a.role));
         this.openM(`
-            <h3 style="margin-top:0">🔒 ใส่รหัสผ่านเพื่อแก้ไขสินค้า</h3>
-            <input type="password" id="auth_pw" class="input-main" placeholder="รหัสผ่าน" autofocus onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.submitAuth(); }">
-            <button class="btn btn-p" style="width:100%;" onclick="App.submitAuth()">ยืนยัน</button>
-            <button class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="App.pendingAuthCb=null; App.closeM()">ยกเลิก</button>
+            <div style="background:#FCEEDC;border:1px solid #F0D19E;border-radius:12px;padding:10px 12px;font-size:12px;color:#7A5416;margin-bottom:12px;">
+                ⚠️ บัญชี "${this.state.authedUser}" เป็นพนักงานทั่วไป ไม่มีสิทธิ์แก้ไขข้อมูลนี้โดยตรง กรุณาให้ผู้ดูแลระบบ (Admin) ยืนยันตัวตนก่อน
+            </div>
+            <h3 style="margin-top:0">🔐 ยืนยันสิทธิ์ผู้ดูแลระบบ</h3>
+            <label style="font-size:11px; font-weight:600; color:var(--ink-s); display:block; margin-bottom:4px;">บัญชี Admin</label>
+            <select id="admin_ov_name" class="input-main">
+                ${admins.map(a=>`<option value="${a.name}">${a.name}</option>`).join('')}
+            </select>
+            <div class="pwd-wrap">
+                <input type="password" id="admin_ov_pass" class="input-main" placeholder="รหัสผ่าน Admin" onkeydown="if(event.key==='Enter'){ event.preventDefault(); App.confirmAdminOverride(); }">
+                <button type="button" class="eye-btn" onclick="App.togglePwd('admin_ov_pass', this)">👁️</button>
+            </div>
+            <div id="admin_ov_err" class="hidden" style="color:var(--err); font-size:12px; margin-bottom:8px;">❌ รหัสผ่าน Admin ไม่ถูกต้อง</div>
+            <button class="btn btn-p" onclick="App.confirmAdminOverride()">✅ ยืนยันและดำเนินการต่อ</button>
+            <button class="btn btn-outline" onclick="App.closeM()">ยกเลิก</button>
         `);
-        setTimeout(() => { const el = document.getElementById('auth_pw'); if(el) el.focus(); }, 200);
+        this._pendingAdminOverride = onSuccess;
     },
-    submitAuth() {
-        const el = document.getElementById('auth_pw');
-        const val = el ? el.value : '';
-        if(val === this.db.settings.editPassword) {
-            this.state.unlocked = true;
-            this.closeM();
-            const cb = this.pendingAuthCb;
-            this.pendingAuthCb = null;
-            if(cb) cb();
-        } else {
-            alert("❌ รหัสผ่านไม่ถูกต้อง");
-        }
+
+    confirmAdminOverride() {
+        const name = document.getElementById('admin_ov_name').value;
+        const pass = document.getElementById('admin_ov_pass').value || '';
+        const acc = this.getAccount(name);
+        const errEl = document.getElementById('admin_ov_err');
+        if(!acc || !this.isAdminRole(acc.role) || acc.password !== pass) { errEl.classList.remove('hidden'); return; }
+        errEl.classList.add('hidden');
+        const cb = this._pendingAdminOverride; this._pendingAdminOverride = null;
+        this.closeM();
+        // เปิดสิทธิ์ Admin ชั่วคราวแค่ระหว่างเรียก callback นี้ (synchronous) เพื่อไม่ให้เช็คสิทธิ์ซ้ำแล้ววนลูป
+        this._adminOverrideActive = true;
+        try { if(cb) cb(); } finally { this._adminOverrideActive = false; }
     },
-    saveEditPassword() {
-        const val = (document.getElementById('edit_pw')?.value || '').trim();
-        const confirmVal = (document.getElementById('edit_pw2')?.value || '').trim();
-        if(!val) { alert("⚠️ กรุณากรอกรหัสผ่าน"); return; }
-        if(val !== confirmVal) { alert("⚠️ รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
-        this.db.settings.editPassword = val;
-        this.state.unlocked = true;
-        this.save();
-        alert("✅ ตั้งรหัสผ่านเรียบร้อยแล้ว");
+
+    logoutAccount() {
+        this.state.authedUser = null;
         this.render();
     },
-    removeEditPassword() {
-        if(!confirm("ต้องการปิดใช้งานรหัสผ่านหรือไม่? หลังจากนี้ใครก็สามารถแก้ไขสินค้าได้โดยไม่ต้องใส่รหัสผ่าน")) return;
-        delete this.db.settings.editPassword;
+
+    // เพิ่มบัญชีจากหน้าตั้งค่า (Admin เท่านั้นที่เห็นการ์ดนี้) เลือก role ได้ทั้ง admin/user
+    addAccount() {
+        const name = (document.getElementById('new_acc_name').value || '').trim();
+        const pass = document.getElementById('new_acc_pass').value || '';
+        const role = document.getElementById('new_acc_role').value || 'user';
+        if(!name || !pass) { alert("กรุณากรอกชื่อและรหัสผ่านให้ครบ"); return; }
+        if(this.getAccount(name)) { alert("มีชื่อนี้ในระบบแล้ว"); return; }
+        this.db.settings.accounts.push({ name, password: pass, role });
         this.save();
-        alert("✅ ปิดใช้งานรหัสผ่านเรียบร้อยแล้ว");
+        this.render();
+    },
+
+    deleteAccount(name) {
+        const acc = this.getAccount(name);
+        if(acc && this.isAdminRole(acc.role) && (this.db.settings.accounts||[]).filter(a=>this.isAdminRole(a.role)).length <= 1) {
+            alert("⚠️ ไม่สามารถลบได้ ต้องมีบัญชี Admin เหลืออยู่อย่างน้อย 1 บัญชีเสมอ");
+            return;
+        }
+        if(!confirm(`ลบบัญชี "${name}" หรือไม่?`)) return;
+        this.db.settings.accounts = this.db.settings.accounts.filter(a => a.name !== name);
+        if(this.state.authedUser === name) this.state.authedUser = null;
+        this.save();
         this.render();
     },
 
