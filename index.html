@@ -105,6 +105,7 @@ body.paper-a4 .receipt-box { font-size: 14px; padding: 16px; border: none; max-w
     <div class="nav-tabs" id="nav-bar">
         <button class="tab-btn active" data-v="dash">📊 หน้าแรก</button>
         <button class="tab-btn" data-v="sell">🛒 ขายสินค้า</button>
+        <button class="tab-btn" data-v="notif">🔔 แจ้งเตือน<span id="notif-badge" class="hidden" style="background:var(--err); color:white; border-radius:10px; font-size:10px; padding:1px 6px; margin-left:4px;">0</span></button>
         <button class="tab-btn" data-v="history">📜 ประวัติบิล</button>
         <button class="tab-btn" data-v="debt">⚠️ ติดหนี้</button>
         <button class="tab-btn" data-v="stock">📦 สต๊อก</button>
@@ -135,7 +136,7 @@ const App = {
         categories: ["ทั่วไป", "อาหารสด/แช่แข็ง", "น้ำมัน/ของใช้รถ"],
         settings: { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" }
     },
-    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null },
+    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null, pendingCustomers: [], newOrders: [] },
 
     init() {
         this.loadingScreen(true);
@@ -143,6 +144,7 @@ const App = {
             this.bind();
             this.render();
             this.loadingScreen(false);
+            this.startNotifPolling();
         }).catch(e => {
             console.error("Load failed:", e);
             this.loadingScreen(false);
@@ -152,6 +154,36 @@ const App = {
             const clockEl = document.getElementById('clock');
             if(clockEl) clockEl.innerText = new Date().toLocaleTimeString('th-TH');
         }, 1000);
+    },
+
+    // เช็คแจ้งเตือนใหม่ (คำขอสมัครลูกค้า + ออเดอร์ใหม่) ทุก 30 วินาที ถ้าเชื่อมต่อ Google Sheets ไว้
+    startNotifPolling() {
+        this.pollNotifications(); // เช็คทันทีตอนเปิดแอปครั้งแรก ไม่ต้องรอ 30 วิ
+        setInterval(() => this.pollNotifications(), 30000);
+    },
+
+    async pollNotifications() {
+        const cfg = this.getCloudConfig();
+        if(!cfg || !cfg.enabled || !cfg.url || !cfg.token || !this.state.authedUser) return;
+        try {
+            const res = await fetch(cfg.url + '?action=getNotifications&token=' + encodeURIComponent(cfg.token));
+            const json = await res.json();
+            if(json.error) { console.warn('poll notif error:', json.error); return; }
+            this.state.pendingCustomers = json.pendingCustomers || [];
+            this.state.newOrders = json.newOrders || [];
+            this.updateNotifBadge();
+            if(this.state.view === 'notif') this.render(); // รีเฟรชหน้าแจ้งเตือนถ้ากำลังเปิดดูอยู่
+        } catch(e) {
+            console.warn('poll notif failed:', e.message);
+        }
+    },
+
+    updateNotifBadge() {
+        const badge = document.getElementById('notif-badge');
+        if(!badge) return;
+        const count = this.state.pendingCustomers.length + this.state.newOrders.length;
+        badge.textContent = count;
+        badge.classList.toggle('hidden', count === 0);
     },
 
     loadingScreen(show) {
@@ -353,6 +385,118 @@ const App = {
         this.render();
     },
 
+    // --- หน้าแจ้งเตือน: คำขอสมัครลูกค้าใหม่ + ออเดอร์ใหม่จากหน้าเว็บลูกค้า ---
+    viewNotif(root) {
+        const cfg = this.getCloudConfig();
+        if(!cfg || !cfg.enabled) {
+            root.innerHTML = `<div class="card" style="text-align:center; padding:30px 16px;">
+                <p style="font-size:13px; color:var(--ink-s);">ยังไม่ได้เชื่อมต่อ Google Sheets — ไปตั้งค่าที่หน้า 🔄 Sync ก่อนเพื่อใช้ระบบแจ้งเตือนลูกค้า</p>
+            </div>`;
+            return;
+        }
+        const { pendingCustomers, newOrders } = this.state;
+        let html = '';
+
+        pendingCustomers.forEach(c => {
+            html += `
+                <div class="card" style="background:#FCEEDC; border-color:#F0D19E;">
+                    <b>🙋 คำขอสมัครสมาชิกใหม่</b><br>
+                    <small>${c.name} · ${c.phone}</small>
+                    <div style="margin-top:10px; display:flex; gap:6px;">
+                        <button class="btn btn-p" style="margin-top:0; width:auto; flex:1; padding:8px; font-size:12px;" onclick="App.approveCustomer('${c.phone}', 'general')">✅ อนุมัติ (ลูกค้าทั่วไป)</button>
+                        <button class="btn btn-a" style="margin-top:0; width:auto; flex:1; padding:8px; font-size:12px;" onclick="App.approveCustomer('${c.phone}', 'member')">🌟 อนุมัติ (สมาชิก)</button>
+                    </div>
+                    <button class="btn btn-outline" style="margin-top:6px; border-color:var(--err); color:var(--err);" onclick="App.rejectCustomer('${c.phone}')">❌ ปฏิเสธ</button>
+                </div>
+            `;
+        });
+
+        newOrders.forEach(o => {
+            html += `
+                <div class="card" style="background:#E8F3EA; border-color:#B8DDBE;">
+                    <b>📦 ออเดอร์ใหม่ — ${o.customerName}</b> <small>(${o.tier === 'member' ? 'สมาชิกร้าน' : 'ลูกค้าทั่วไป'})</small><br>
+                    <small>${o.items.map(i => i.name + ' x' + i.qty).join(', ')}</small>
+                    <div style="margin-top:10px; display:flex; gap:6px;">
+                        <button class="btn btn-outline" style="margin-top:0; width:auto; flex:1; padding:8px; font-size:12px;" onclick='App.printPickList(${JSON.stringify(o)})'>🖨️ พิมพ์ใบจัดของ</button>
+                        <button class="btn btn-p" style="margin-top:0; width:auto; flex:1; padding:8px; font-size:12px;" onclick="App.ackOrder('${o.orderId}')">✅ รับทราบแล้ว</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        if(!html) html = `<div class="card" style="text-align:center; padding:30px 16px;"><p style="font-size:13px; color:var(--ink-s);">ไม่มีการแจ้งเตือนใหม่ในตอนนี้</p></div>`;
+        root.innerHTML = `<h3 style="margin:0 0 10px;">🔔 การแจ้งเตือน</h3>` + html;
+    },
+
+    async approveCustomer(phone, tier) {
+        const cfg = this.getCloudConfig();
+        try {
+            const res = await fetch(cfg.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'approveCustomer', token: cfg.token, phone, tier })
+            });
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            alert('✅ อนุมัติเรียบร้อย (' + (tier === 'member' ? 'สมาชิกร้าน' : 'ลูกค้าทั่วไป') + ')');
+            this.pollNotifications();
+        } catch(e) {
+            alert('❌ อนุมัติไม่สำเร็จ: ' + e.message);
+        }
+    },
+
+    async rejectCustomer(phone) {
+        if(!confirm('ปฏิเสธคำขอสมัครของลูกค้ารายนี้?')) return;
+        const cfg = this.getCloudConfig();
+        try {
+            const res = await fetch(cfg.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'rejectCustomer', token: cfg.token, phone })
+            });
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            this.pollNotifications();
+        } catch(e) {
+            alert('❌ ไม่สำเร็จ: ' + e.message);
+        }
+    },
+
+    async ackOrder(orderId) {
+        const cfg = this.getCloudConfig();
+        try {
+            const res = await fetch(cfg.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'ackOrder', token: cfg.token, orderId })
+            });
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            this.pollNotifications();
+        } catch(e) {
+            alert('❌ ไม่สำเร็จ: ' + e.message);
+        }
+    },
+
+    // พิมพ์ใบจัดของสำหรับออเดอร์ลูกค้า (ใช้ระบบพิมพ์เดิมของแอป)
+    printPickList(order) {
+        const printArea = document.getElementById('receipt-print');
+        printArea.innerHTML = `
+            <div class="receipt-box">
+                <h3 style="text-align:center; margin-top:0;">ใบจัดของ (ออเดอร์ลูกค้า)</h3>
+                <p>รหัสออเดอร์: ${order.orderId}</p>
+                <p>ลูกค้า: ${order.customerName} (${order.tier === 'member' ? 'สมาชิกร้าน' : 'ลูกค้าทั่วไป'})</p>
+                <p>เวลาสั่ง: ${order.createdAt}</p>
+                <hr>
+                ${order.items.map(i => `<p>☐ ${i.name} x${i.qty}</p>`).join('')}
+            </div>
+        `;
+        printArea.classList.remove('hidden');
+        this.applyPrintPaperSize();
+        window.print();
+        printArea.classList.add('hidden');
+    },
+
     bind() {
         const navBar = document.getElementById('nav-bar');
         if(navBar) {
@@ -408,6 +552,7 @@ const App = {
 
             if(this.state.view === 'dash') this.viewDash(root);
             else if(this.state.view === 'sell') this.viewSell(root);
+            else if(this.state.view === 'notif') this.viewNotif(root);
             else if(this.state.view === 'history') this.viewHistory(root);
             else if(this.state.view === 'debt') this.viewDebt(root);
             else if(this.state.view === 'stock') this.viewStock(root);
@@ -439,6 +584,18 @@ const App = {
                     </div>
                     <button class="btn btn-p" onclick="App.setupFirstAdmin()">✅ สร้างบัญชี Admin และเข้าใช้งาน</button>
                     <p style="font-size:11px; color:var(--ink-s); margin-top:10px; margin-bottom:0;">บัญชีอื่นๆ ในภายหลัง ต้องให้ Admin เป็นคนเพิ่มให้เท่านั้น จากหน้าตั้งค่า (User ทั่วไปสร้างบัญชีเองไม่ได้)</p>
+                </div>
+
+                <div class="card">
+                    <h3 style="margin-top:0; font-size:14px;">📱 เครื่องนี้เป็นเครื่องใหม่ แต่ร้านคุณมีข้อมูลอยู่แล้ว?</h3>
+                    <p style="font-size:12px; color:var(--ink-s); margin-top:0;">ถ้าเคยเชื่อมต่อ Google Sheets ไว้ที่เครื่องอื่นแล้ว (เช่น คอมพิวเตอร์หลักของร้าน) กรอก URL และรหัสลับชุดเดียวกันตรงนี้ เพื่อดึงบัญชี/ข้อมูลร้านเดิมมาใช้ที่เครื่องนี้ทันที ไม่ต้องสร้าง Admin ซ้ำ</p>
+                    <input type="text" id="gate_cloud_url" class="input-main" placeholder="Web app URL (https://script.google.com/macros/s/.../exec)">
+                    <div class="pwd-wrap">
+                        <input type="password" id="gate_cloud_token" class="input-main" placeholder="รหัสลับ (SECRET_TOKEN)">
+                        <button type="button" class="eye-btn" onclick="App.togglePwd('gate_cloud_token', this)">👁️</button>
+                    </div>
+                    <div id="gate_cloud_err" class="hidden" style="color:var(--err); font-size:12px; margin-bottom:8px;"></div>
+                    <button class="btn btn-outline" onclick="App.gateConnectExisting()">🔗 ดึงข้อมูลร้านเดิมมาที่เครื่องนี้</button>
                 </div>
             `;
             return;
@@ -474,6 +631,33 @@ const App = {
         this.save();
         this.state.authedUser = name;
         this.render();
+    },
+
+    // สำหรับเครื่องใหม่ที่ยังไม่มีบัญชีในเครื่อง แต่ร้านมีข้อมูล/บัญชีอยู่แล้วบน Google Sheets
+    // ดึงข้อมูลร้านทั้งหมดมาใช้ที่เครื่องนี้เลย แทนที่จะต้องสร้าง Admin ใหม่ซ้ำ
+    async gateConnectExisting() {
+        const url = (document.getElementById('gate_cloud_url').value || '').trim();
+        const token = document.getElementById('gate_cloud_token').value || '';
+        const errEl = document.getElementById('gate_cloud_err');
+        errEl.classList.add('hidden');
+        if(!url || !token) { errEl.textContent = 'กรุณากรอก URL และรหัสลับให้ครบ'; errEl.classList.remove('hidden'); return; }
+        this.saveCloudConfig({ url, token, enabled: true });
+        try {
+            const cloudData = await this.cloudPull();
+            if(!cloudData || !Array.isArray(cloudData.settings?.accounts) || cloudData.settings.accounts.length === 0) {
+                errEl.textContent = 'ดึงข้อมูลสำเร็จ แต่ยังไม่พบบัญชีใดๆ ในร้านนี้ (อาจจะยังไม่เคยซิงค์จากเครื่องหลักเลย)';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            this.db = cloudData;
+            this.ensureSchemaDefaults();
+            await this.idbSet('sanpos_v15_db', this.db);
+            this._cloudStatus = 'synced';
+            this.render(); // จะเห็นบัญชีที่มีอยู่แล้ว ให้ล็อกอินได้ตามปกติ
+        } catch(e) {
+            errEl.textContent = '❌ เชื่อมต่อไม่สำเร็จ: ' + e.message + ' — ตรวจสอบ URL และรหัสลับอีกครั้ง';
+            errEl.classList.remove('hidden');
+        }
     },
 
     gateLogin() {
