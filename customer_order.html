@@ -154,6 +154,15 @@ function startPolling() {
   }, 30000); // เช็คทุก 30 วินาที
 }
 
+const UNIT_LABEL = { '1': 'ชิ้น', '2': 'แพ็ค', '3': 'ลัง' };
+
+function getUnitPrice(p, unit) {
+  const priceField = (myTier === 'member' ? 'pw' : 'pr') + unit;
+  return p[priceField] || 0;
+}
+
+function cartKey(id, unit) { return id + '::' + unit; }
+
 function renderShop() {
   document.getElementById('root').innerHTML = `
     <div class="card" style="padding:10px 16px; text-align:center;">
@@ -166,27 +175,38 @@ function renderShop() {
   `;
   const grid = document.getElementById('prodGrid');
   grid.innerHTML = products.map(p => {
-    const price = myTier === 'member' ? (p.pw1 || p.pr1) : p.pr1;
+    // แสดงเฉพาะหน่วยที่ร้านตั้งราคาไว้จริง (ชิ้นมีเสมอ, แพ็ค/ลังมีเฉพาะถ้าตั้งราคาไว้)
+    const units = ['1'];
+    if (getUnitPrice(p, '2') > 0) units.push('2');
+    if (getUnitPrice(p, '3') > 0) units.push('3');
     return `
       <div class="p-card">
         <img src="${p.img || 'https://via.placeholder.com/100'}">
         <b>${p.name}</b>
-        <div class="price">฿${price}</div>
-        <div class="qty-ctrl">
-          <button onclick="changeQty('${p.id}', -1)">-</button>
-          <span id="qty-${p.id}">${cart[p.id] || 0}</span>
-          <button onclick="changeQty('${p.id}', 1)">+</button>
-        </div>
+        ${units.map(u => `
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px solid #eee;">
+            <div style="text-align:left;">
+              <div style="font-size:11px; color:var(--ink-s);">${UNIT_LABEL[u]}</div>
+              <div class="price" style="font-size:13px;">฿${getUnitPrice(p, u)}</div>
+            </div>
+            <div class="qty-ctrl" style="margin-top:0;">
+              <button onclick="changeQty('${p.id}', '${u}', -1)">-</button>
+              <span id="qty-${cartKey(p.id, u)}">${cart[cartKey(p.id, u)] || 0}</span>
+              <button onclick="changeQty('${p.id}', '${u}', 1)">+</button>
+            </div>
+          </div>
+        `).join('')}
       </div>
     `;
   }).join('');
   updateCartBar();
 }
 
-function changeQty(id, delta) {
-  cart[id] = Math.max(0, (cart[id] || 0) + delta);
-  if (cart[id] === 0) delete cart[id];
-  document.getElementById('qty-' + id).textContent = cart[id] || 0;
+function changeQty(id, unit, delta) {
+  const key = cartKey(id, unit);
+  cart[key] = Math.max(0, (cart[key] || 0) + delta);
+  if (cart[key] === 0) delete cart[key];
+  document.getElementById('qty-' + key).textContent = cart[key] || 0;
   updateCartBar();
 }
 
@@ -196,20 +216,21 @@ function updateCartBar() {
   const totalQty = items.reduce((s, [, q]) => s + q, 0);
   if (totalQty === 0) { bar.classList.add('hidden'); return; }
   bar.classList.remove('hidden');
-  document.getElementById('cartSummary').textContent = `🛒 ตะกร้า: ${totalQty} ชิ้น`;
+  document.getElementById('cartSummary').textContent = `🛒 ตะกร้า: ${totalQty} รายการ`;
 }
 
 function openCartModal() {
   const items = Object.entries(cart);
-  const lines = items.map(([id, qty]) => {
+  const lines = items.map(([key, qty]) => {
+    const [id, unit] = key.split('::');
     const p = products.find(x => x.id === id);
-    const price = myTier === 'member' ? (p.pw1 || p.pr1) : p.pr1;
-    return `<div class="cart-line"><span>${p.name} x${qty}</span><span>฿${price * qty}</span></div>`;
+    const price = getUnitPrice(p, unit);
+    return `<div class="cart-line"><span>${p.name} [${UNIT_LABEL[unit]}] x${qty}</span><span>฿${price * qty}</span></div>`;
   }).join('');
-  const total = items.reduce((s, [id, qty]) => {
+  const total = items.reduce((s, [key, qty]) => {
+    const [id, unit] = key.split('::');
     const p = products.find(x => x.id === id);
-    const price = myTier === 'member' ? (p.pw1 || p.pr1) : p.pr1;
-    return s + price * qty;
+    return s + getUnitPrice(p, unit) * qty;
   }, 0);
   document.getElementById('modalRoot').innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this) closeCartModal()">
@@ -228,9 +249,10 @@ function openCartModal() {
 function closeCartModal() { document.getElementById('modalRoot').innerHTML = ''; }
 
 async function confirmOrder() {
-  const items = Object.entries(cart).map(([id, qty]) => {
+  const items = Object.entries(cart).map(([key, qty]) => {
+    const [id, unit] = key.split('::');
     const p = products.find(x => x.id === id);
-    return { name: p.name, qty };
+    return { name: p.name + ' [' + UNIT_LABEL[unit] + ']', qty };
   });
   if (items.length === 0) { alert('กรุณาเลือกสินค้าก่อน'); return; }
   const res = await apiPost('placeOrder', { phone: myPhone, items });
