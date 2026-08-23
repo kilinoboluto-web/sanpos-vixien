@@ -137,7 +137,7 @@ const App = {
         categories: ["ทั่วไป", "อาหารสด/แช่แข็ง", "น้ำมัน/ของใช้รถ"],
         settings: { storeName: "ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ" }
     },
-    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null, pendingCustomers: [], newOrders: [], allCustomers: [], customerSearch: '' },
+    state: { view: 'dash', cart: [], member: null, activeCat: 'ทั้งหมด', scanner: null, editingProductId: null, labelMode: false, labelSelected: [], stockSearch: '', stockCat: 'ทั้งหมด', authedUser: null, pendingCustomers: [], newOrders: [], allCustomers: [], customerSearch: '', allOrders: [], historyTab: 'store' },
 
     init() {
         this.loadingScreen(true);
@@ -582,6 +582,9 @@ const App = {
                         ${c.status === 'rejected' ? `
                             <button class="btn btn-p" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px;" onclick="App.custAction('approve','${c.phone}','general')">✅ อนุมัติใหม่</button>
                         ` : ''}
+                        ${c.status === 'approved' ? `
+                            <button class="btn btn-outline" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px;" onclick="App.viewCustomerOrders('${c.phone}','${c.name}')">📋 ดูประวัติสั่งซื้อ</button>
+                        ` : ''}
                         <button class="btn btn-outline" style="margin-top:0; width:auto; padding:7px 10px; font-size:12px; border-color:var(--err); color:var(--err);" onclick="App.custAction('delete','${c.phone}')">🗑️ ลบ</button>
                     </div>
                 </div>
@@ -618,6 +621,36 @@ const App = {
             this.pollNotifications(); // อัปเดตเลขแจ้งเตือนด้วย เผื่อมีการอนุมัติ/ปฏิเสธจากหน้านี้
         } catch(e) {
             alert('❌ ไม่สำเร็จ: ' + e.message);
+        }
+    },
+
+    // ดูประวัติการสั่งซื้อของลูกค้ารายหนึ่งโดยเฉพาะ (ดึงออเดอร์ทั้งหมดแล้วกรองด้วยเบอร์โทร)
+    async viewCustomerOrders(phone, name) {
+        const cfg = this.getCloudConfig();
+        this.openM(`<h3 style="margin-top:0">📋 ประวัติสั่งซื้อ: ${name}</h3><p style="font-size:13px; color:var(--ink-s); text-align:center;">⏳ กำลังโหลด...</p>`);
+        try {
+            const res = await fetch(cfg.url + '?action=getAllOrders&token=' + encodeURIComponent(cfg.token));
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            const orders = (json.orders || []).filter(o => o.phone === phone).reverse();
+            const STATUS_LABEL = { new: '🆕 ใหม่', seen: '✅ รับทราบแล้ว' };
+            this.openM(`
+                <h3 style="margin-top:0">📋 ประวัติสั่งซื้อ: ${name}</h3>
+                <div style="max-height:60vh; overflow-y:auto;">
+                    ${orders.map(o => `
+                        <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                            <div style="display:flex; justify-content:space-between;">
+                                <small style="color:var(--ink-s);">${o.createdAt}</small>
+                                <small>${STATUS_LABEL[o.status] || o.status}</small>
+                            </div>
+                            <small>${o.items.map(i => i.name + ' x' + i.qty).join(', ')}</small>
+                        </div>
+                    `).join('') || '<p style="font-size:13px; color:var(--ink-s); text-align:center;">ยังไม่มีประวัติสั่งซื้อ</p>'}
+                </div>
+                <button class="btn btn-outline" style="margin-top:14px;" onclick="App.closeM()">ปิด</button>
+            `);
+        } catch(e) {
+            this.openM(`<h3 style="margin-top:0">📋 ประวัติสั่งซื้อ: ${name}</h3><p style="font-size:13px; color:var(--err);">โหลดไม่สำเร็จ: ${e.message}</p><button class="btn btn-outline" onclick="App.closeM()">ปิด</button>`);
         }
     },
 
@@ -1335,28 +1368,95 @@ const App = {
 
     // --- HISTORY ---
     viewHistory(root) {
+        if(!this.state.historyTab) this.state.historyTab = 'store';
         root.innerHTML = `
+            <div class="card" style="padding:8px;">
+                <div style="display:flex; gap:6px;">
+                    <button class="btn ${this.state.historyTab==='store' ? 'btn-p' : 'btn-outline'}" style="margin-top:0;" onclick="App.switchHistoryTab('store')">🏪 หน้าร้าน</button>
+                    <button class="btn ${this.state.historyTab==='online' ? 'btn-p' : 'btn-outline'}" style="margin-top:0;" onclick="App.switchHistoryTab('online')">🌐 ออนไลน์</button>
+                </div>
+            </div>
+            <div id="history-content"></div>
+        `;
+        this.renderHistoryTabContent();
+    },
+
+    switchHistoryTab(tab) {
+        this.state.historyTab = tab;
+        this.viewHistory(document.getElementById('view-port'));
+    },
+
+    renderHistoryTabContent() {
+        const container = document.getElementById('history-content');
+        if(!container) return;
+        if(this.state.historyTab === 'store') {
+            container.innerHTML = `
+                <div class="card">
+                    <h3 style="margin-top:0">📜 ประวัติการขายหน้าร้าน</h3>
+                    <table>
+                        <thead><tr><th>วันที่/เวลา</th><th>ยอดขาย</th><th>ลูกค้า</th><th>จัดการ</th></tr></thead>
+                        <tbody>
+                            ${(this.db.sales || []).slice().reverse().map(s => `
+                                <tr style="${s.refunded?'text-decoration:line-through;opacity:0.5':''}">
+                                    <td><small>${new Date(s.date).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'})}</small></td>
+                                    <td class="mono">฿${(s.total||0).toLocaleString()}</td>
+                                    <td><small>${s.memberName || 'ทั่วไป'}</small></td>
+                                    <td>
+                                        <button onclick="App.billDetail('${s.id}')">ดู</button>
+                                        <button onclick="App.printBill('${s.id}')">🖨️</button>
+                                    </td>
+                                </tr>
+                            `).join('') || '<tr><td colspan="4" style="text-align:center">ยังไม่มีประวัติการขาย</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else {
+            const cfg = this.getCloudConfig();
+            if(!cfg || !cfg.enabled) {
+                container.innerHTML = `<div class="card" style="text-align:center;"><p style="font-size:13px; color:var(--ink-s);">ยังไม่ได้เชื่อมต่อ Google Sheets — ไปตั้งค่าที่หน้า 🔄 Sync ก่อน</p></div>`;
+                return;
+            }
+            container.innerHTML = `<div class="card" style="text-align:center;"><p style="font-size:13px; color:var(--ink-s);">⏳ กำลังโหลดประวัติออนไลน์...</p></div>`;
+            this.loadAndRenderOnlineHistory(container);
+        }
+    },
+
+    async loadAndRenderOnlineHistory(container) {
+        const cfg = this.getCloudConfig();
+        try {
+            const res = await fetch(cfg.url + '?action=getAllOrders&token=' + encodeURIComponent(cfg.token));
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            this.state.allOrders = json.orders || [];
+        } catch(e) {
+            container.innerHTML = `<div class="card" style="text-align:center;"><p style="font-size:13px; color:var(--err);">โหลดไม่สำเร็จ: ${e.message}</p></div>`;
+            return;
+        }
+        const STATUS_LABEL = { new: '🆕 ใหม่', seen: '✅ รับทราบแล้ว' };
+        const list = this.state.allOrders.slice().reverse();
+        container.innerHTML = `
             <div class="card">
-                <h3 style="margin-top:0">📜 ประวัติการขายสินค้า</h3>
-                <table>
-                    <thead><tr><th>วันที่/เวลา</th><th>ยอดขาย</th><th>ลูกค้า</th><th>จัดการ</th></tr></thead>
-                    <tbody>
-                        ${(this.db.sales || []).slice().reverse().map(s => `
-                            <tr style="${s.refunded?'text-decoration:line-through;opacity:0.5':''}">
-                                <td><small>${new Date(s.date).toLocaleString('th-TH', {dateStyle:'short', timeStyle:'short'})}</small></td>
-                                <td class="mono">฿${(s.total||0).toLocaleString()}</td>
-                                <td><small>${s.memberName || 'ทั่วไป'}</small></td>
-                                <td>
-                                    <button onclick="App.billDetail('${s.id}')">ดู</button>
-                                    <button onclick="App.printBill('${s.id}')">🖨️</button>
-                                </td>
-                            </tr>
-                        `).join('') || '<tr><td colspan="4" style="text-align:center">ยังไม่มีประวัติการขาย</td></tr>'}
-                    </tbody>
-                </table>
+                <h3 style="margin-top:0">🌐 ประวัติการสั่งซื้อออนไลน์ (${list.length})</h3>
+                ${list.map(o => `
+                    <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <b style="font-size:13px;">${o.customerName}</b>
+                            <small style="color:var(--ink-s);">${STATUS_LABEL[o.status] || o.status}</small>
+                        </div>
+                        <small class="mono">${o.phone} · ${o.tier === 'member' ? 'สมาชิกร้าน' : 'ลูกค้าทั่วไป'}</small><br>
+                        <small>${o.items.map(i => i.name + ' x' + i.qty).join(', ')}</small><br>
+                        <small style="color:var(--ink-s);">${o.createdAt}</small>
+                        <div style="margin-top:6px;">
+                            <button class="btn btn-outline" style="margin-top:0; width:auto; padding:6px 12px; font-size:12px;" onclick='App.printPickList(${JSON.stringify(o)})'>🖨️ พิมพ์ใบจัดของ</button>
+                        </div>
+                    </div>
+                `).join('') || '<div style="text-align:center; padding:10px; font-size:13px; color:var(--ink-s);">ยังไม่มีประวัติออเดอร์ออนไลน์</div>'}
             </div>
         `;
     },
+
+
 
     billDetail(sid) {
         const s = this.db.sales.find(x => x.id === sid);
