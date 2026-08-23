@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>สั่งซื้อสินค้าออนไลน์</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --p: #1F5F4A; --pd: #143C30; --a: #E8A33D;
+  --bg: #F2F4EE; --surf: #FFFFFF; --line: #DDE3D9;
+  --ink: #1C2320; --ink-s: #5B655F; --err: #C1502E; --ok: #2E7D32;
+}
+* { box-sizing: border-box; }
+body { margin:0; font-family:'Kanit',sans-serif; background:var(--bg); color:var(--ink); padding:16px; max-width:480px; margin:0 auto; padding-bottom:100px; }
+h1 { font-size:17px; color:var(--pd); margin:0 0 4px; text-align:center; }
+.sub { color:var(--ink-s); font-size:12px; margin-bottom:16px; text-align:center; }
+.card { background:var(--surf); border-radius:18px; padding:16px; margin-bottom:14px; border:1px solid var(--line); }
+.card h3 { font-size:14px; margin:0 0 10px; }
+.btn { border:none; border-radius:12px; padding:12px 16px; font-family:'Kanit',sans-serif; font-size:14px; font-weight:600; cursor:pointer; width:100%; margin-top:8px; }
+.btn-p { background:var(--p); color:white; }
+.btn-outline { background:none; border:1.5px solid var(--line); color:var(--ink); }
+.input-main { width:100%; padding:11px 12px; border-radius:12px; border:1.5px solid var(--line); font-family:'Kanit',sans-serif; font-size:14px; margin-bottom:10px; background:#fff; }
+.p-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
+.p-card { background:white; border:1.5px solid var(--line); border-radius:14px; padding:10px; text-align:center; }
+.p-card img { width:100%; height:80px; object-fit:cover; border-radius:10px; background:#eee; }
+.p-card b { font-size:12px; display:block; margin-top:6px; min-height:32px; }
+.p-card .price { color:var(--p); font-weight:700; font-size:15px; }
+.p-card .qty-ctrl { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:6px; }
+.p-card .qty-ctrl button { width:28px; height:28px; border-radius:8px; border:1px solid var(--line); background:#fff; font-size:16px; cursor:pointer; }
+.status-box { text-align:center; padding:36px 16px; }
+.cart-bar { position:fixed; bottom:0; left:0; right:0; background:var(--pd); color:white; padding:14px 20px; display:flex; justify-content:space-between; align-items:center; max-width:480px; margin:0 auto; cursor:pointer; }
+.hidden { display:none !important; }
+.tier-badge { display:inline-block; padding:4px 12px; border-radius:12px; font-size:12px; font-weight:600; background:#E8F3EA; color:var(--ok); }
+.modal-overlay { position:fixed; inset:0; background:rgba(20,30,25,0.5); display:flex; align-items:flex-end; justify-content:center; z-index:999; }
+.modal { background:var(--surf); width:100%; max-width:480px; border-radius:22px 22px 0 0; padding:20px; max-height:80vh; overflow-y:auto; }
+.cart-line { display:flex; justify-content:space-between; align-items:center; font-size:13px; padding:8px 0; border-bottom:1px solid #eee; }
+</style>
+</head>
+<body>
+
+<h1 id="storeName">🛍️ กำลังโหลดร้านค้า...</h1>
+<p class="sub">สั่งซื้อสินค้าออนไลน์ ไม่ต้องเดินทาง</p>
+
+<div id="root"></div>
+
+<div id="cartBar" class="cart-bar hidden" onclick="openCartModal()">
+  <span id="cartSummary">ตะกร้า: 0 รายการ</span>
+  <span>ดูตะกร้า ›</span>
+</div>
+
+<div id="modalRoot"></div>
+
+<script>
+// ⚠️ ตั้งค่า 2 บรรทัดนี้ให้ตรงกับร้านของคุณก่อนใช้งานจริง (เอาจากขั้นตอน Deploy Apps Script)
+const API_URL = 'https://script.google.com/macros/s/AKfycbx9tHoJ4LemWCu1YWOiAAeb-zJDfL1dHfIqki54ecH5K7cY6bkEeSdZ_-ZrfU52V6bG/exec';
+
+let myPhone = localStorage.getItem('cust_phone') || '';
+let myName = localStorage.getItem('cust_name') || '';
+let myTier = null;
+let products = [];
+let cart = {}; // {productId: qty}
+let pollTimer = null;
+
+async function apiGet(action, params) {
+  const qs = new URLSearchParams({ action, ...params }).toString();
+  const res = await fetch(API_URL + '?' + qs);
+  return res.json();
+}
+async function apiPost(action, data) {
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, ...data })
+  });
+  return res.json();
+}
+
+async function init() {
+  const info = await apiGet('getProductsForCustomer', {});
+  if (info.ok) {
+    document.getElementById('storeName').textContent = '🛍️ ' + (info.storeName || 'ร้านค้า');
+    products = info.products || [];
+  }
+
+  if (myPhone) {
+    const status = await apiGet('checkCustomerStatus', { phone: myPhone });
+    if (status.found) {
+      if (status.status === 'approved') { myTier = status.tier; renderShop(); return; }
+      if (status.status === 'pending') { renderPending(); startPolling(); return; }
+      if (status.status === 'rejected') { renderRejected(); return; }
+    }
+  }
+  renderRegister();
+}
+
+function renderRegister() {
+  document.getElementById('root').innerHTML = `
+    <div class="card">
+      <h3>👋 ยินดีต้อนรับ กรุณาสมัครสมาชิกก่อนสั่งของ</h3>
+      <input class="input-main" id="rName" placeholder="ชื่อ-นามสกุล">
+      <input class="input-main" id="rPhone" placeholder="เบอร์โทรศัพท์" type="tel">
+      <button class="btn btn-p" onclick="doRegister()">✅ สมัครสมาชิก</button>
+    </div>
+  `;
+}
+
+async function doRegister() {
+  const name = document.getElementById('rName').value.trim();
+  const phone = document.getElementById('rPhone').value.trim();
+  if (!name || !phone) { alert('กรุณากรอกชื่อและเบอร์โทรให้ครบ'); return; }
+  const res = await apiPost('registerCustomer', { name, phone });
+  if (res.error) { alert('เกิดข้อผิดพลาด: ' + res.error); return; }
+  myPhone = phone; myName = name;
+  localStorage.setItem('cust_phone', phone);
+  localStorage.setItem('cust_name', name);
+  if (res.alreadyExists && res.status === 'approved') { location.reload(); return; }
+  renderPending();
+  startPolling();
+}
+
+function renderPending() {
+  document.getElementById('root').innerHTML = `
+    <div class="card status-box">
+      <div style="font-size:44px;">⏳</div>
+      <h3 style="margin-top:10px;">รอการอนุมัติจากร้านค้า</h3>
+      <p style="font-size:12px; color:var(--ink-s);">ทางร้านได้รับคำขอสมัครของคุณแล้ว หน้านี้จะเปลี่ยนอัตโนมัติเมื่อได้รับอนุมัติ (ไม่ต้องปิดหน้าจอ)</p>
+    </div>
+  `;
+}
+
+function renderRejected() {
+  document.getElementById('root').innerHTML = `
+    <div class="card status-box">
+      <div style="font-size:44px;">❌</div>
+      <h3 style="margin-top:10px;">คำขอสมัครไม่ได้รับการอนุมัติ</h3>
+      <p style="font-size:12px; color:var(--ink-s);">กรุณาติดต่อร้านค้าโดยตรงเพื่อสอบถามรายละเอียด</p>
+    </div>
+  `;
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    const status = await apiGet('checkCustomerStatus', { phone: myPhone });
+    if (status.found && status.status === 'approved') {
+      clearInterval(pollTimer); pollTimer = null;
+      myTier = status.tier;
+      renderShop();
+    } else if (status.found && status.status === 'rejected') {
+      clearInterval(pollTimer); pollTimer = null;
+      renderRejected();
+    }
+  }, 30000); // เช็คทุก 30 วินาที
+}
+
+function renderShop() {
+  document.getElementById('root').innerHTML = `
+    <div class="card" style="padding:10px 16px; text-align:center;">
+      <span class="tier-badge">${myTier === 'member' ? '🌟 สมาชิกร้าน (ราคาส่ง)' : '👤 ลูกค้าทั่วไป (ราคาปลีก)'}</span>
+    </div>
+    <div class="card">
+      <h3>🛍️ สินค้าในร้าน</h3>
+      <div class="p-grid" id="prodGrid"></div>
+    </div>
+  `;
+  const grid = document.getElementById('prodGrid');
+  grid.innerHTML = products.map(p => {
+    const price = myTier === 'member' ? (p.pw1 || p.pr1) : p.pr1;
+    return `
+      <div class="p-card">
+        <img src="${p.img || 'https://via.placeholder.com/100'}">
+        <b>${p.name}</b>
+        <div class="price">฿${price}</div>
+        <div class="qty-ctrl">
+          <button onclick="changeQty('${p.id}', -1)">-</button>
+          <span id="qty-${p.id}">${cart[p.id] || 0}</span>
+          <button onclick="changeQty('${p.id}', 1)">+</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateCartBar();
+}
+
+function changeQty(id, delta) {
+  cart[id] = Math.max(0, (cart[id] || 0) + delta);
+  if (cart[id] === 0) delete cart[id];
+  document.getElementById('qty-' + id).textContent = cart[id] || 0;
+  updateCartBar();
+}
+
+function updateCartBar() {
+  const bar = document.getElementById('cartBar');
+  const items = Object.entries(cart);
+  const totalQty = items.reduce((s, [, q]) => s + q, 0);
+  if (totalQty === 0) { bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  document.getElementById('cartSummary').textContent = `🛒 ตะกร้า: ${totalQty} ชิ้น`;
+}
+
+function openCartModal() {
+  const items = Object.entries(cart);
+  const lines = items.map(([id, qty]) => {
+    const p = products.find(x => x.id === id);
+    const price = myTier === 'member' ? (p.pw1 || p.pr1) : p.pr1;
+    return `<div class="cart-line"><span>${p.name} x${qty}</span><span>฿${price * qty}</span></div>`;
+  }).join('');
+  const total = items.reduce((s, [id, qty]) => {
+    const p = products.find(x => x.id === id);
+    const price = myTier === 'member' ? (p.pw1 || p.pr1) : p.pr1;
+    return s + price * qty;
+  }, 0);
+  document.getElementById('modalRoot').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this) closeCartModal()">
+      <div class="modal">
+        <h3 style="margin-top:0;">🛒 ตะกร้าของคุณ</h3>
+        ${lines || '<p style="font-size:12px; color:var(--ink-s);">ตะกร้าว่าง</p>'}
+        <div style="display:flex; justify-content:space-between; font-weight:700; padding:12px 0; font-size:15px;">
+          <span>รวมทั้งหมด</span><span>฿${total}</span>
+        </div>
+        <button class="btn btn-p" onclick="confirmOrder()">📤 ยืนยันสั่งซื้อ</button>
+        <button class="btn btn-outline" onclick="closeCartModal()">ปิด</button>
+      </div>
+    </div>
+  `;
+}
+function closeCartModal() { document.getElementById('modalRoot').innerHTML = ''; }
+
+async function confirmOrder() {
+  const items = Object.entries(cart).map(([id, qty]) => {
+    const p = products.find(x => x.id === id);
+    return { name: p.name, qty };
+  });
+  if (items.length === 0) { alert('กรุณาเลือกสินค้าก่อน'); return; }
+  const res = await apiPost('placeOrder', { phone: myPhone, items });
+  if (res.error) { alert('เกิดข้อผิดพลาด: ' + res.error); return; }
+  cart = {};
+  closeCartModal();
+  document.getElementById('cartBar').classList.add('hidden');
+  document.getElementById('root').innerHTML = `
+    <div class="card status-box">
+      <div style="font-size:44px;">✅</div>
+      <h3 style="margin-top:10px;">ส่งออเดอร์เรียบร้อยแล้ว!</h3>
+      <p style="font-size:12px; color:var(--ink-s);">ทางร้านได้รับออเดอร์ของคุณแล้ว กำลังจัดเตรียมสินค้า</p>
+      <button class="btn btn-outline" onclick="renderShop()">🛍️ สั่งซื้อเพิ่มเติม</button>
+    </div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>
