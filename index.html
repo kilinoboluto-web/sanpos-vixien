@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ</title>
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<!-- Chart.js / html5-qrcode / JsBarcode ถูกย้ายไปโหลดแบบ lazy (เฉพาะตอนใช้งานจริง) ในโค้ด JS ด้านล่างแทน
+     เพื่อไม่ให้บล็อกการแสดงผลหน้า login/แอปตอนเปิดครั้งแรก (แก้ปัญหาโหลดช้า) -->
 
 <style>
 :root {
@@ -187,6 +186,21 @@ const App = {
         badge.classList.toggle('hidden', count === 0);
     },
 
+    // โหลดไลบรารีภายนอก (Chart.js/html5-qrcode/JsBarcode) เฉพาะตอนใช้งานจริงเท่านั้น (lazy load)
+    // ไม่ให้บล็อกการแสดงผลหน้า login/แอปตอนเปิดครั้งแรกเหมือนเดิม (โหลด <script> ไว้ล่วงหน้าตั้งแต่ <head>)
+    _loadedScripts: {},
+    loadScript(src) {
+        if(this._loadedScripts[src]) return this._loadedScripts[src];
+        this._loadedScripts[src] = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = () => resolve();
+            s.onerror = () => { delete this._loadedScripts[src]; reject(new Error('โหลดไม่สำเร็จ กรุณาเช็คอินเทอร์เน็ต')); };
+            document.head.appendChild(s);
+        });
+        return this._loadedScripts[src];
+    },
+
     loadingScreen(show) {
         let el = document.getElementById('loading-overlay');
         if(show) {
@@ -354,20 +368,4 @@ const App = {
     // --- ซิงค์ข้อมูลออนไลน์กับ Google Sheets (ผ่าน Apps Script Web App) ---
     // ตั้งค่าการเชื่อมต่อ (URL/รหัสลับ) เก็บไว้ที่ localStorage ของเครื่องนี้เท่านั้น ไม่ปนกับข้อมูลร้านที่ซิงค์ไปมา
     getCloudConfig() {
-        try { return JSON.parse(localStorage.getItem('sanpos_cloud_config') || 'null'); } catch(e) { return null; }
-    },
-    saveCloudConfig(cfg) {
-        localStorage.setItem('sanpos_cloud_config', JSON.stringify(cfg));
-    },
-    async cloudPull() {
-        const cfg = this.getCloudConfig();
-        if(!cfg || !cfg.url || !cfg.token) return null;
-        const res = await fetch(cfg.url + '?token=' + encodeURIComponent(cfg.token));
-        const json = await res.json();
-        if(json.error) throw new Error(json.error);
-        return json.data;
-    },
-    // หมายเหตุ: ไม่ดักจับ error ในนี้ ปล่อยให้ผู้เรียกใช้ (save()/connectCloud()) เป็นคนจัดการ
-    // เพื่อให้ตอนกด "เชื่อมต่อ" เห็น error จริงถ้าส่งไม่สำเร็จ แทนที่จะขึ้นว่าสำเร็จทั้งที่ไม่ได้ส่งจริง
-    async cloudPush() {
-     
+        try { return JSON.parse(localStorage.getItem('sanpos_cloud_config') |
