@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#143C30">
 <!-- โหลด Google Fonts แบบไม่บล็อกหน้าจอ (async) - ถ้าเซิร์ฟเวอร์ฟอนต์โหลดช้า/เข้าไม่ได้ หน้าเว็บจะยังแสดงผลได้ปกติทันที ไม่ต้องรอฟอนต์ -->
 <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap"></noscript>
@@ -101,6 +103,7 @@ body.paper-a4 .receipt-box { font-size: 14px; padding: 16px; border: none; max-w
         <div id="app-title" style="font-size:15px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:75%;">ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ</div>
         <div id="clock" class="mono" style="font-size:11px;">00:00:00</div>
     </div>
+    <button id="install-btn" class="hidden" onclick="App.installApp()" style="width:100%; margin-top:8px; background:var(--a); color:var(--pd); border:none; border-radius:10px; padding:8px; font-family:'Kanit',sans-serif; font-size:12px; font-weight:700; cursor:pointer;">📲 ติดตั้งแอปนี้ลงเครื่อง</button>
     <div id="user-info-bar" class="hidden" style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:6px; opacity:0.9;">
         <span>👤 <b id="user-info-name"></b> <span id="user-info-role" class="mono" style="opacity:0.8;"></span></span>
         <button onclick="App.logoutAccount()" style="background:none; border:none; color:inherit; text-decoration:underline; cursor:pointer; font-family:'Kanit',sans-serif; font-size:11px;">ออกจากระบบ</button>
@@ -2543,6 +2546,39 @@ const App = {
 window.addEventListener('DOMContentLoaded', () => {
     App.init();
 });
+
+// --- PWA: ลงทะเบียน Service Worker + ปุ่ม "ติดตั้งแอปนี้ลงเครื่อง" ---
+// ต้องมี service worker ทำงานอยู่ เบราว์เซอร์ถึงจะยอมให้ติดตั้งเป็นแอปได้ (ข้อกำหนดของ Chrome/Android)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('service-worker.js').catch(e => console.warn('ลงทะเบียน Service Worker ไม่สำเร็จ:', e.message));
+}
+
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e; // เก็บไว้ใช้ตอนกดปุ่มเอง แทนที่จะให้ browser เด้ง popup เองแบบสุ่ม
+    const btn = document.getElementById('install-btn');
+    if(btn) btn.classList.remove('hidden');
+});
+
+// ถ้าติดตั้งไปแล้ว (เปิดแอปจากไอคอนที่ติดตั้งไว้) ซ่อนปุ่มทิ้งไปเลย ไม่ต้องโชว์ซ้ำ
+window.addEventListener('appinstalled', () => {
+    _deferredInstallPrompt = null;
+    const btn = document.getElementById('install-btn');
+    if(btn) btn.classList.add('hidden');
+});
+
+App.installApp = async function() {
+    if(!_deferredInstallPrompt) {
+        alert('⚠️ เบราว์เซอร์นี้ยังไม่พร้อมให้ติดตั้ง (อาจติดตั้งไปแล้ว หรือเบราว์เซอร์ไม่รองรับ) ลองใช้เมนู "เพิ่มไปยังหน้าจอโฮม" ของเบราว์เซอร์แทนได้ครับ');
+        return;
+    }
+    _deferredInstallPrompt.prompt();
+    await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    const btn = document.getElementById('install-btn');
+    if(btn) btn.classList.add('hidden');
+};
 
 // แจ้งเตือนถ้าเกิด error ระหว่างใช้งาน (เช่น กดปุ่มแล้วไม่มีอะไรเกิดขึ้น) จะได้เห็นสาเหตุแทนที่จะเงียบ
 window.addEventListener('error', (e) => {
