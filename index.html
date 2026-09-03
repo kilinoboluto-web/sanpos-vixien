@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>ປ້ຳນຳ້ມັນ ວິຊຽນ ຂາຍເຄື່ອງສົ່ງ-ຍ່ອຍ ອາຫານສົດແລະແຊ່ແຂວງ</title>
-<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<!-- โหลด Google Fonts แบบไม่บล็อกหน้าจอ (async) - ถ้าเซิร์ฟเวอร์ฟอนต์โหลดช้า/เข้าไม่ได้ หน้าเว็บจะยังแสดงผลได้ปกติทันที ไม่ต้องรอฟอนต์ -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap"></noscript>
+<style>/* ฟอนต์สำรอง ระหว่างรอ Kanit โหลด (หรือกรณีโหลดฟอนต์ไม่ได้เลย) หน้าเว็บยังอ่านง่ายได้ปกติ */
+body { font-family: 'Kanit', 'Noto Sans Lao', 'Segoe UI', Tahoma, sans-serif; }</style>
 <!-- Chart.js / html5-qrcode / JsBarcode ถูกย้ายไปโหลดแบบ lazy (เฉพาะตอนใช้งานจริง) ในโค้ด JS ด้านล่างแทน
      เพื่อไม่ให้บล็อกการแสดงผลหน้า login/แอปตอนเปิดครั้งแรก (แก้ปัญหาโหลดช้า) -->
 
@@ -376,24 +380,43 @@ const App = {
     async cloudPull() {
         const cfg = this.getCloudConfig();
         if(!cfg || !cfg.url || !cfg.token) return null;
-        const res = await fetch(cfg.url + '?token=' + encodeURIComponent(cfg.token));
-        const json = await res.json();
-        if(json.error) throw new Error(json.error);
-        return json.data;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // เลิกรอถ้าเกิน 8 วิ กันหน้าเว็บค้างไม่มีกำหนด
+        try {
+            const res = await fetch(cfg.url + '?token=' + encodeURIComponent(cfg.token), { signal: controller.signal });
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            return json.data;
+        } catch(e) {
+            if(e.name === 'AbortError') throw new Error('เชื่อมต่อ Google Sheets ไม่ทันเวลา (เกิน 8 วินาที) - เช็คอินเทอร์เน็ต');
+            throw e;
+        } finally {
+            clearTimeout(timeoutId);
+        }
     },
     // หมายเหตุ: ไม่ดักจับ error ในนี้ ปล่อยให้ผู้เรียกใช้ (save()/connectCloud()) เป็นคนจัดการ
     // เพื่อให้ตอนกด "เชื่อมต่อ" เห็น error จริงถ้าส่งไม่สำเร็จ แทนที่จะขึ้นว่าสำเร็จทั้งที่ไม่ได้ส่งจริง
     async cloudPush() {
         const cfg = this.getCloudConfig();
         if(!cfg || !cfg.url || !cfg.token || !cfg.enabled) return;
-        const res = await fetch(cfg.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // กัน CORS preflight ของ Apps Script
-            body: JSON.stringify({ token: cfg.token, data: this.db })
-        });
-        const json = await res.json();
-        if(json.error) throw new Error(json.error);
-        this._cloudStatus = 'synced';
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // เลิกรอถ้าเกิน 8 วิ กันค้างไม่มีกำหนด
+        try {
+            const res = await fetch(cfg.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // กัน CORS preflight ของ Apps Script
+                body: JSON.stringify({ token: cfg.token, data: this.db }),
+                signal: controller.signal
+            });
+            const json = await res.json();
+            if(json.error) throw new Error(json.error);
+            this._cloudStatus = 'synced';
+        } catch(e) {
+            if(e.name === 'AbortError') throw new Error('ส่งข้อมูลไม่ทันเวลา (เกิน 8 วินาที) - เช็คอินเทอร์เน็ต');
+            throw e;
+        } finally {
+            clearTimeout(timeoutId);
+        }
     },
 
     renderCloudStatus() {
